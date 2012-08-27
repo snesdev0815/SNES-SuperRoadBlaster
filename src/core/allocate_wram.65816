@@ -1,0 +1,327 @@
+/**
+* wram allocation manager
+*
+* dynamically de/allocates a couple of wram blocks
+* primary use is having a persistent, non-moving chunk of data to dma from/to
+*
+*/
+
+
+.include "src/core/allocate_wram.h"
+.section "allocate_wram"
+
+/**
+*
+*/
+core.wram.init:
+  php
+  rep #$31
+  sep #$20
+  ;clear block buffer
+  lda #WRAM.CLEAR_PATTERN.ZERO
+  ldy.w #WRAM_ALLOCATE.GLOBAL.END - WRAM_ALLOCATE.GLOBAL.START
+  ldx.w #WRAM_ALLOCATE.GLOBAL.START
+  jsr ClearWRAM
+
+  ;clear actual wram buffer
+  lda #WRAM.CLEAR_PATTERN.ZERO
+  ldy.w #GLOBAL.wramBuffer.end - GLOBAL.wramBuffer.start
+  ldx.w #GLOBAL.wramBuffer.start
+  jsr ClearWRAM
+
+  stz.w GLOBAL.currentWramAllocationId
+  plp
+  rts
+
+/**
+*
+*/
+/*
+allocateWramBadStepsize:
+  pha
+  TRIGGER_ERROR E_VallocBadStepsize
+
+*/
+/**
+* attempt allocating desired wram space
+*
+* @param x <int,16bit>	desired size of allocated block in bytes.
+*
+* @return a <int,8bit>	allocation block id
+* @return x <int,16bit>	wram start adress, relative to buffer
+* @return c <bool>	true if allocation succeeded
+*/
+core.wram.allocate:
+  php
+  rep #$31
+/*
+  cmp.w #WRAM_ALLOCATION_STEP.MIN
+  bcc allocateWramBadStepsize
+
+  cmp.w #WRAM_ALLOCATION_STEP.MAX + 1
+  bcs allocateWramBadStepsize
+
+  sta.w GLOBAL.wramAllocation.input.stepsize
+*/
+  cpx.w #0
+  bne +
+    TRIGGER_ERROR E_VallocInvalidLength
+
++ stx.w GLOBAL.wramAllocation.input.length
+  stx.w GLOBAL.wramAllocation.temp.length
+
+  jsr _allocateWramSeekFreeBlocks
+  bcs +
+	;allocation failed, not enough wram space left
+	plp
+	clc
+	rts
++ sep #$20
+  inc.w GLOBAL.currentWramAllocationId
+  bne +
+    ;allocation id must be non-zero
+    inc.w GLOBAL.currentWramAllocationId
+    
++ 
+-
+  lda.w GLOBAL.currentWramAllocationId
+  jsr _isIdInUse
+  bcc +
+    inc.w GLOBAL.currentWramAllocationId
+    bra -
+
++  
+  lda.w GLOBAL.currentWramAllocationId
+  jsr _markAllocatedWramBlocks
+
+  ldx.w GLOBAL.wramAllocation.temp.start
+
+  plp
+  sec
+  rts
+
+/**
+* go through wram blocks check if input id is already used
+*
+* @param a<int,8bit>  block id
+* @return carry<bool>   true if block id already in use
+*
+*/
+_isIdInUse:
+  php
+  rep #$31
+  phx
+  sep #$20
+
+  ldx.w #WRAM_ALLOCATION_BLOCKS
+-   cmp.w GLOBAL.wramAllocationBlocks,x
+    bne +
+
+      plx
+      plp
+      sec
+      rts
++   dex
+    bpl -
+
+  rep #$31
+
+  plx
+  plp
+  clc
+  rts
+
+  
+/**
+* go through wram blocks and return block start adress if successful
+*
+* @return carry<bool>	true if free block area found
+* @return y<int,16bit>	block start id
+*
+*/
+_allocateWramSeekFreeBlocks:
+  php
+  rep #$31
+
+  ldy.w #0
+  sty.w GLOBAL.wramAllocation.temp.start
+/*
+  tya
+  sta.w GLOBAL.wramAllocation.temp.start
+  xba			;allocatio blocksize: $100
+  and.w #$ff
+
+  tay
+*/
+_allocateWramSeekLoop:
+  lda.w GLOBAL.wramAllocationBlocks,y
+  and.w #$ff
+  beq _allocateWramBlockFree
+
+	;block is occupied, reset length counter
+	lda.w GLOBAL.wramAllocation.input.length
+	sta.w GLOBAL.wramAllocation.temp.length
+
+	;advance to next block according to stepsize
+	lda.w GLOBAL.wramAllocation.temp.start
+	clc
+	inc a
+	;adc.w GLOBAL.wramAllocation.input.stepsize
+	bcc +
+	  ;allocation failed, end of wram reached
+	  plp
+	  clc
+	  rts
+
++
+	sta.w GLOBAL.wramAllocation.temp.start
+	/*lsr a		;allocation blocksize : $80
+	lsr a
+	lsr a
+	lsr a
+	lsr a
+	lsr a
+	lsr a*/
+	xba			;allocation blocksize : $100
+	and.w #$ff
+	cmp.w #WRAM_ALLOCATION_BLOCKS
+	bcc +
+	  ;allocation failed, end of wram reached
+	  plp
+	  clc
+	  rts
+
++	tay
+	bra _allocateWramSeekLoop
+
+_allocateWramBlockFree:
+  iny
+  cpy.w #WRAM_ALLOCATION_BLOCKS + 1
+  bne +
+	;allocation failed, end of wram reached
+	plp
+	clc
+	rts
+
++ lda.w GLOBAL.wramAllocation.temp.length
+  sec
+  sbc.w #WRAM_ALLOCATION_BLOCKSIZE
+  sta.w GLOBAL.wramAllocation.temp.length
+  beq +
+  bcs _allocateWramSeekLoop
+
+;allocation successful
++ plp
+  sec
+  rts
+
+/**
+* mark allocated wram blocks with allocation id
+*
+* @param a<int,8bit>	allocation id
+* @param y<int,16bit>	start block id
+*/
+_markAllocatedWramBlocks:
+  php
+  rep #$31
+  pha
+
+  lda.w GLOBAL.wramAllocation.temp.start
+  /*lsr a		;allocation blocksize : $80
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a*/
+  xba			;allocation blocksize : $100
+  and.w #$ff
+  tay
+
+/*
+  ;$100 byte blocks
+  lda.w GLOBAL.wramAllocation.input.length
+  xba
+  ;half-occupied blocks present? will occupy full block
+  bit.w #$ff00
+  beq +
+	inc a
+
++ and.w #$ff
+*/
+  ;$80 byte blocks
+  lda.w GLOBAL.wramAllocation.input.length
+  ;half-occupied blocks present? will occupy full block
+  bit.w #WRAM_ALLOCATION_BLOCKSIZE - 1
+  beq +
+	clc
+	adc.w #WRAM_ALLOCATION_BLOCKSIZE
+
++ /*lsr a		;allocation blocksize : $80
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a*/
+  xba			;allocatio blocksize: $100
+  and.w #$ff
+  tax
+  pla
+  sep #$20
+-	sta.w GLOBAL.wramAllocationBlocks,y
+	iny
+	dex
+	bne -
+
+  plp
+  rts
+
+/**
+* deallocate wram blocks.
+*
+* @param a<int,8bit>	allocation id of blocks to be deallocated
+* @return c<bool>   set if deallocation was successful
+*/
+core.wram.deallocate:
+  php
+  rep #$31
+  phx
+  sep #$20
+  cmp.w GLOBAL.currentWramAllocationId
+  bne +
+	;only chance to decrease allocation id is when topmost id gets deallocated
+	dec.w GLOBAL.currentWramAllocationId
+
++ pea 0
+
+  ldx.w #WRAM_ALLOCATION_BLOCKS
+-	cmp.w GLOBAL.wramAllocationBlocks,x
+	bne +
+	  sta 1,s
+	  stz.w GLOBAL.wramAllocationBlocks,x
++	dex
+	bpl -
+;	cpx.w #$ffff
+;	bne -
+
+  rep #$31
+  tax
+  pla
+  bne +
+	;hits if someone tries to deallocate id 0(already empty block) or if there were no blocks that could be deallocated for given id
+/*
+	phx
+    TRIGGER_ERROR E_VallocEmptyDeallocation
+
+*/
+    plx
+    plp
+    clc
+    rts
+    
++ plx
+  plp
+  sec
+  rts
+.ends

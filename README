@@ -1,0 +1,127 @@
+Super Road Blaster v1.2 sourcecode for Super Nintendo
+2012-08-26 Matthias "d4s" Nagler <matt@dforce3000.de>
+
+Please note:
+This release enables you to build the game ROM file, but does not build msu datafile & msu audio files by default.
+The tools & provisions to build these are there,
+but have been disabled because they require the original video file from the iPhone version of the game
+and also because the building will take ages, as the conversion tools are written in python and not optimized at all.
+Therefore, these files will have to be taken & copied from the regular release of the game instead.
+
+
+Requirements to build game ROM:
+-os: linux 
+-tools:
+  -WLA DX 9.5a
+  -python 2.7.2 (not tested with python 3+! Will probably need adjustments.)
+  -snesbrr by DMV27
+
+Compilation instructions:
+-download, compile & install wla dx 9.5a by Ville Hellin (http://www.villehelin.com/wla.html).
+-download, compile & install snesbrr by DMV27 (http://www.romhacking.net/utilities/407/).
+-download, compile & install python 2.7.2. Other versions might work, but might require modifications to tools.
+-unpack Super Road Blaster sourcecode
+-enter source folder, run make
+-download regular Super Road Blaster release and manually copy manifest xml, msu datafile and pcm soundfiles into ./build folder.
+-run game with emulator, preferably bsnes v070.
+
+General concept:
+This game is written purely in 65816 assembler.
+Apart from that, this game builds upon an abstraction layer that takes ideas from object oriented programming intended
+to enhance flexibility.
+Also, most of the used resources such as work RAM, video RAM, color palettes, DMA channels and such are
+allocated dynamically to optimize resource usage and lessen the burden of resource micro-management.
+However, the abstraction layer also imposes a performance drop.
+The whole abstraction concept is severely limited by WLA DX's capabilities.
+Also, you'll find that I use many terms familiar from object oriented programming,
+but use them to adress functionality that deviates from the commonly accepted meaning.
+
+The advantages of representing almost everything in the game, from textlayers, sound interface, scores, sprites and even keypress events by an object are these:
+-it's possible to generate any number of instances of objects whenever required without having to micro-manage data access.
+For example, it's possible to have any number of active control scripts operating individually at the same time.
+-objects presenting uniform interfaces can be grouped, selected and processed in a generalized fashion.
+For example, one might select all objects implementing the dimension interface (i.e. objects that have a visible representation onscreen) and sort them by their z-position for correct visual priority.
+The same sorting method can equally be employed to sort highscores by selecting all objects of type score.
+Another example: In Super Road Blaster, the dashboard during gameplay consists of a background layer, a steering wheel sprite and an HDMA effect to switch video modes, each represented by an object having a specific property ("isDash").
+By grabbing all objects with that specific property, it's possible to move them around in unison, without having to worry about their specific implementation details.
+
+
+Terminology:
+-class:
+  -a set of named methods coupled with variable members, grouped under a common class name
+  -defined with CLASS macro, which also denotes all public (=externally accessible) methods.
+  -has at least three default methods (init,play,kill).
+-object
+  -instanciation of a class, consisting of an entry on the object stack, aswell as a private (=not externally accessible) slice of ram in the zero-page area (some sort of heap).  
+  -created with NEW macro, which takes class name and optional parameters passed to the object constructor(method init) and returns object hash(sort of pointer/reference to instanciated object).
+  -always has default methods init(constructor, called on instanciation), play(called once every frame), kill(destructor, called upon object deletion).
+  -lives until object is explicitly deleted/killed.
+  -methods of object are called with CALL macro, which takes method, object hash and optional parameters
+-object stack
+  -despite the name not a stack, but rather a list of currently active objects.
+-object hash
+  -unique reference/pointer to an object consisting of class id, pointer to object in object stack and instancation counter.
+  -will be generated upon object instanciation, required to call methods on instanciated object
+-object zp:
+  -block of memory linked to object instance containing objects private member variables.
+  -commonly refered to with prefix "this." inside object code.
+-object properties:
+  -each object has a set of bitflags called properties that are used to select and group objects. Examples are "isSprite"(representing a sprite onscreen), "isSerializable"(being serializable and subsequently save & loadable from & to battery-backed sram), "isHdma"(representing an HDMA effect) etc.
+-core:
+  -static game-independant core functionality such as irq, dma channel handling and vram/cgram allocation.
+-inheritance
+  -despite the name, there is no inheritance parent/child model between classes at all.
+  -instead, inheritance files contain methods that are by default implicitly "inherited" by any class.
+-interface
+  -interfaces are predefined methods and variable members that each class implementing the interface in question also implements.
+  -as an example, any class implementing the "dimension"-interface will automatically implement methods and member variables to expose object position
+-abstract
+  -abstract classes are classes that may not be instanciated themselves, but provide useful methods useable by other objects in their vicinity.
+  For example, abstract.Sprite.65816 implements a couple of methods to automatically allocate memory and start sprite animations, which are used by all other sprite objects.
+-garbage collection
+  -there is no implicit garbage collection.
+  -Even if nobody holds a pointer (=object hash) to an object, it is kept alive as long as it is explicitly killed.
+  -A killed object will be marked deleted, then actually removed and its memory freed after all objects in the current frame have had their play-methods triggered.
+-script
+  -not a separate scripting language, but rather an object of type script controlling logical game flow.
+  For example, each video chapter, the highscore screen and the title screen each have their own script which controls what happens next.
+-iterator
+  -a provision for generically iterating/looping over sets of objects by their class ids or properties.
+  -each object implementing the iterator interface has its own iterator state and target variables.
+-unit tests
+  -a sadly rather incomplete set of unit tests to make sure the engine is working correctly.
+
+
+source folder structure
+-data
+  -sounds: sound effect samples in wav-format. Get converted to brr-format samples.
+  -songs: music in ProTracker mod-format. A couple of limitations are imposed on these because of hardware limitations. (sample length/loop points must be dividable by 16, maximum filesize limited to ~50kbytes)
+  -sprites: folders containing sprite graphics (usually in png format, but other common graphics formats are supported aswell). These get converted to sprite animation files. Each individual graphics file represents a frame in the resulting animation.
+  -font: font graphics files
+  -backgrounds: Background graphic files, get converted to background animation file (though Super Road Blaster only uses static backgrounds)
+  -events: xml files containing timing & action information that drive gameplay. These are used to both cut up the original video file into chapters aswell as generate script files that control gameplay (written to ./data/chapters)
+-src
+  -config: global static definitions, macros and such that get included in every sourcecode file
+  -core: core functionality such as booting, IRQ handling, dynamic memory allocation for WRAM,VRAM,CGRAM,DMA channels and such.
+  -definition: aliases for SNES registers, MSU-1 registers etc.
+  -object: contain specific classes of objects that handle individual parts of the game. For example, each background layer type, each HDMA effect, the MSU1 interface, the audio interface and the like are each represented by their own class/object.
+  -text: text variables used throughout the game.
+  *.script: top-level control scripts
+-tools
+  -animationWriter.py: uses gracon.py to write graphics animation files(sprite or backgrounds). Animations consists of multiple graphics frames sharing common palettes (maybe comparable to gif-animations, but without timing information).
+  -gracon.py: handles graphics conversion to various SNES formats. Supports a vast array of input file formats. Can output background and sprite graphics. Can optimize graphics (Merge similar-looking tiles) and palettes. Slow.
+  -mod2snes.py: converts music in ProTracker mod-format to custom SNES format. A couple of limitations are imposed on these because of hardware limitations. (sample length/loop points must be dividable by 16, maximum filesize limited to ~50kbytes)
+  -msu1blockwriter.py: takes video image files in ./data/chapters/* and creates msu1 datafile consisting of chapters which in turn contain video frames in snes format.
+  -msu1pcmwriter.py: takes wav-format audio files from ./data/chapters/* and converts them to custom msu1 audio format.
+  -userOptions.py: just a couple of helpful stuff to handle user input.
+  -xmlsceneparser.py. parses event xml files in ./data/events and generates a folder for each in ./data/chapters containing chapter id, chapter script and (optionally) video frames in png-format and audio data in wav-format. Also optionally triggers ffmpeg to generate chapter video frames from input video in ./data/video and triggers gimp to smoothen out frame graphics to let them compress better using gimp-batch-convert-indexed.scm.
+
+
+program flow:
+-first of all, code in ./src/core/boot.65816 is executed, which initializes all core modules, then instanciates script ./src/main.script and enters mainloop.
+-next, ./src/main.script instanciates a copy of the MSU-1 interface and initializes highscore data (from battery-backed sram if applicable).
+-after that, control is passed to ./src/msu1.script, which instanciates audio interfaces, displays and then passes control to ./src/data/chapters/logo_intro/chapter.script.
+-finally, all further game action is controlled by events in currently active chapter scripts.
+
+
+

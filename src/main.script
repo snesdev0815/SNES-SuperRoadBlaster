@@ -1,0 +1,54 @@
+
+	SCRIPT main
+
+  .def sram hashPtr.1
+
+  ;create once to properly reset msu1 hardware
+  NEW Msu1.CLS.PTR hashPtr.1
+  CALL Msu1.kill.MTD hashPtr.1
+
+  ;first try to load score objects from sram
+  lda.w #OBJECT.PROPERTIES.isSerializable
+  jsr core.persistency.load
+  bcs +
+
+    ;if load didn't succeed for whatever reason (sram bad, sram empty etc.), create a new set of fresh default scores.
+    ;important: persistency loading may have aborted halfway through, so there may be more than five score objects present after this!!!
+    jsr abstract.Iterator.reset
+    lda.w #OBJID.Score
+    jsr abstract.Iterator.each.byId
+    bcs +
+
+      ;load some default hiscores if none present yet
+      pea HIGHSCORE.COUNT	;counter
+      pea 10	;score
+-
+        lda 1,s
+
+        pea $0053	;"d4s "
+        pea $3444
+        pha
+        NEW Score.CLS.PTR oopCreateNoPtr
+        pla
+        pla
+        pla
+
+        lda 1,s
+        clc
+        adc.w #10
+        sta 1,s
+
+        lda 3,s
+        dec a
+        sta 3,s
+        bne -
+
+      pla
+      pla
+
++
+
+  NEW Script.CLS.PTR oopCreateNoPtr msu1
+
+  jsr SavePC
+  rts

@@ -1,0 +1,351 @@
+/**
+* vram allocation manager
+*
+* statically assigning vram space sucks, because it hinders flexibility, code reusability and space usage.
+* that's why this handler dynamically allocates and manages available vram space.
+* 
+* feature outline:
+*   -vram is divided into equal allocation blocks ($100 x $100 bytes)
+*   -routines may request allocated memory by specifying desired start, length, stepsize. if no block with desired criteria can be found, this is reported back.
+*   -allocator seeks free blocks, if successful allocates them with allocation id, clears newly-allocated vram to 0 and returns id to calling routine for later reference
+*   -deallocation: routines supply allocation id, allocator frees all allocated blocks with said id.
+*   -id is one byte, sequential. hopefully we can get away with just incrementing id on every call
+*   -all supplied adresses lengths are real adresses, not /2 for vram or anything like that
+*   -block format: $100 * $100 blocks. 0 marks empty block
+* 
+* routines:
+* -init:
+*   -clear allocation blocks
+*   -clear id
+* 
+* -allocateVram:(param a: stepsize(word, $40-$4000), x: length(word). returns: a: id, x:start
+*   -start at 0, check if free
+* 	-if free mark temp.start, check next block until temp.length is satisfied(decrease temp.length by blocksize each step)
+* 	-if not, advance by stepsize, reset temp.start, temp.length, try again.
+* 	-if adress wraps around, return false
+*   -if free space was found, fetch id, mark all blocks from temp.start through temp.length as blocked, then return real adress/length & id to caller
+*   -dont clear vram implicitly, caller has to do that himself(or just use don't care about previous data)
+* 
+* 
+* -deallocateVram:(param a: id)
+*   -walk all blocks, clear block to 0 where id = input id.
+*   -if no block was found, something went wrong(issue exception)
+*   
+*
+*/
+
+
+.include "src/core/allocate_vram.h"
+.section "allocate_vram"
+
+/**
+*
+*/
+core.vram.init:
+  php
+  rep #$31
+  sep #$20
+  lda #0
+  ldy.w #VRAM_ALLOCATE.GLOBAL.END - VRAM_ALLOCATE.GLOBAL.START
+  ldx.w #VRAM_ALLOCATE.GLOBAL.START
+  jsr ClearWRAM
+  stz.w GLOBAL.currentVramAllocationId
+  plp
+  rts
+
+/**
+*
+*/
+allocateVramBadStepsize:
+  pha
+  TRIGGER_ERROR E_VallocBadStepsize
+
+
+/**
+* attempt allocating desired vram space
+*
+* @param a <int,16bit>	stepsize ($40 - $4000). a lot of things such as tiles, tilemaps and such must be boundary-aligned, that's why this is needed
+* @param x <int,16bit>	desired size of allocated block in bytes.
+* @param y <int,16bit>	start adress of desired block. required for sprites etc.
+*
+* @return a <int,8bit>	allocation block id
+* @return x <int,16bit>	vram start adress
+* @return c <bool>	true if allocation succeeded
+*/
+core.vram.allocate:
+  php
+  rep #$31
+  cmp.w #VRAM_ALLOCATION_STEP.MIN
+  bcc allocateVramBadStepsize
+
+  cmp.w #VRAM_ALLOCATION_STEP.MAX + 1
+  bcs allocateVramBadStepsize
+
+  sta.w GLOBAL.vramAllocation.input.stepsize
+  cpx.w #0
+  bne +
+    TRIGGER_ERROR E_VallocInvalidLength
+
+
++ stx.w GLOBAL.vramAllocation.input.length
+  stx.w GLOBAL.vramAllocation.temp.length
+
+  jsr allocateVramSeekFreeBlocks
+  bcs +
+	;allocation failed, not enough vram space left
+	plp
+	clc
+	rts
++ sep #$20
+  inc.w GLOBAL.currentVramAllocationId
+  bne +
+	;allocation id must be non-zero
+	inc.w GLOBAL.currentVramAllocationId
+	
++ 
+-
+  lda.w GLOBAL.currentVramAllocationId
+  jsr _isIdInUse
+  bcc +
+    inc.w GLOBAL.currentVramAllocationId
+    bra -
+
++  
+  lda.w GLOBAL.currentVramAllocationId
+  jsr markAllocatedVramBlocks
+
+  ldx.w GLOBAL.vramAllocation.temp.start
+
+  plp
+  sec
+  rts
+
+/**
+* go through vram blocks check if input id is already used
+*
+* @param a<int,8bit>  block id
+* @return carry<bool>   true if block id already in use
+*
+*/
+_isIdInUse:
+  php
+  rep #$31
+  phx
+  sep #$20
+
+  ldx.w #VRAM_ALLOCATION_BLOCKS
+-   cmp.w GLOBAL.vramAllocationBlocks,x
+    bne +
+
+      plx
+      plp
+      sec
+      rts
++   dex
+    bpl -
+
+  rep #$31
+
+  plx
+  plp
+  clc
+  rts
+  
+/**
+* go through vram blocks and return block start adress if successful
+*
+* @return carry<bool>	true if free block area found
+* @return y<int,16bit>	block start id
+*
+*/
+allocateVramSeekFreeBlocks:
+  php
+  rep #$31
+
+;  ldy.w #0
+  ;sty.w GLOBAL.vramAllocation.temp.start
+  tya
+  sta.w GLOBAL.vramAllocation.temp.start
+  xba			;allocatio blocksize: $100
+  and.w #$ff
+  /*lsr a		;allocation blocksize: $80
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a*/
+  tay
+
+allocateVramSeekLoop:
+  lda.w GLOBAL.vramAllocationBlocks,y
+  and.w #$ff
+  beq allocateVramBlockFree
+
+	;block is occupied, reset length counter
+	lda.w GLOBAL.vramAllocation.input.length
+	sta.w GLOBAL.vramAllocation.temp.length
+
+	;advance to next block according to stepsize
+	lda.w GLOBAL.vramAllocation.temp.start
+	clc
+	adc.w GLOBAL.vramAllocation.input.stepsize
+	bcc +
+	  ;allocation failed, end of vram reached
+	  plp
+	  clc
+	  rts
+
++
+	sta.w GLOBAL.vramAllocation.temp.start
+	/*lsr a		;allocation blocksize : $80
+	lsr a
+	lsr a
+	lsr a
+	lsr a
+	lsr a
+	lsr a*/
+	xba			;allocation blocksize : $100
+	and.w #$ff
+	cmp.w #VRAM_ALLOCATION_BLOCKS
+	bcc +
+	  ;allocation failed, end of vram reached
+	  plp
+	  clc
+	  rts
+
++	tay
+	bra allocateVramSeekLoop
+
+allocateVramBlockFree:
+  iny
+  cpy.w #VRAM_ALLOCATION_BLOCKS + 1
+  bne +
+	;allocation failed, end of vram reached
+	plp
+	clc
+	rts
+
++ lda.w GLOBAL.vramAllocation.temp.length
+  sec
+  sbc.w #VRAM_ALLOCATION_BLOCKSIZE
+  sta.w GLOBAL.vramAllocation.temp.length
+  beq +
+  bcs allocateVramSeekLoop
+
+;allocation successful
++ plp
+  sec
+  rts
+
+/**
+* mark allocated vram blocks with allocation id
+*
+* @param a<int,8bit>	allocation id
+* @param y<int,16bit>	start block id
+*/
+markAllocatedVramBlocks:
+  php
+  rep #$31
+  pha
+
+  lda.w GLOBAL.vramAllocation.temp.start
+  /*lsr a		;allocation blocksize : $80
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a*/
+  xba			;allocation blocksize : $100
+  and.w #$ff
+  tay
+
+/*
+  ;$100 byte blocks
+  lda.w GLOBAL.vramAllocation.input.length
+  xba
+  ;half-occupied blocks present? will occupy full block
+  bit.w #$ff00
+  beq +
+	inc a
+
++ and.w #$ff
+*/
+  ;$80 byte blocks
+  lda.w GLOBAL.vramAllocation.input.length
+  ;half-occupied blocks present? will occupy full block
+  bit.w #VRAM_ALLOCATION_BLOCKSIZE - 1
+  beq +
+	clc
+	adc.w #VRAM_ALLOCATION_BLOCKSIZE
+
++ /*lsr a		;allocation blocksize : $80
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a*/
+  xba			;allocatio blocksize: $100
+  and.w #$ff
+  tax
+  pla
+  sep #$20
+-	sta.w GLOBAL.vramAllocationBlocks,y
+	iny
+	dex
+	bne -
+
+  plp
+  rts
+
+/**
+* deallocate vram blocks.
+*
+* @param a<int,8bit>	allocation id of blocks to be deallocated
+* @return c<bool>   set if deallocation was successful
+*/
+core.vram.deallocate:
+  php
+  rep #$31
+  phx
+  sep #$20
+  cmp.w GLOBAL.currentVramAllocationId
+  bne +
+	;only chance to decrease allocation id is when topmost id gets deallocated
+	dec.w GLOBAL.currentVramAllocationId
+
++ pea 0
+
+  ldx.w #VRAM_ALLOCATION_BLOCKS
+-	cmp.w GLOBAL.vramAllocationBlocks,x
+	bne +
+	  sta 1,s
+	  stz.w GLOBAL.vramAllocationBlocks,x
++	dex
+	bpl -
+;	cpx.w #$ffff
+;	bne -
+
+  rep #$31
+  tax
+  pla
+  bne +
+	;hits if someone tries to deallocate id 0(already empty block) or if there were no blocks that could be deallocated for given id
+/*
+	phx
+    TRIGGER_ERROR E_VallocEmptyDeallocation
+
+*/
+    plx
+    plp
+    clc
+    rts
+    
++ plx
+  plp
+  sec
+  rts
+
+.ends

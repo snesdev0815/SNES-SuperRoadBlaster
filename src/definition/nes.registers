@@ -1,0 +1,86 @@
+;NES register definitions
+
+;PPU regs
+.define PPUCTRL $2000
+  .define PPUCTRL_VBLANK				1 << 7
+  .define PPUCTRL_MASTER_SLAVE		1 << 6
+  .define PPUCTRL_SPRITE_SIZE			1 << 5
+  .define PPUCTRL_SCREEN_TBL_ADDR		1 << 4
+  .define PPUCTRL_SPRITE_TBL_ADDR		1 << 3
+  .define PPUCTRL_VERT_WRITE_INC		1 << 2
+  .define PPUCTRL_NAME_TBL_2000		0 << 0
+  .define PPUCTRL_NAME_TBL_2400		1 << 0
+  .define PPUCTRL_NAME_TBL_2800		2 << 0
+  .define PPUCTRL_NAME_TBL_2C00		3 << 0
+
+.define PPUMASK $2001
+  .define PPUMASK_BGCOLOR_BLACK		0 << 5
+  .define PPUMASK_BGCOLOR_BLUE		1 << 5
+  .define PPUMASK_BGCOLOR_GREEN		2 << 5
+  .define PPUMASK_BGCOLOR_RED			4 << 5
+  .define PPUMASK_SPRITE_ENABLE		1 << 4
+  .define PPUMASK_SCREEN_ENABLE		1 << 3
+  .define PPUMASK_SPRITE_MASK			1 << 2
+  .define PPUMASK_IMAGE_MASK			1 << 1
+  .define PPUMASK_MONOCHROME			1 << 0
+
+.define PPUSTATUS $2002
+  .define PPUSTATUS_IN_VBLANK			1 << 7
+  .define PPUSTATUS_SPRITE_0_HIT		1 << 6
+  .define PPUSTATUS_SPRITE_COUNT		1 << 5
+  .define PPUSTATUS_VRAM_WRITE			1 << 4
+
+.define OAMADDR $2003
+
+.define OAMDATA $2004
+
+.define PPUSCROLL $2005
+
+.define PPUADDR $2006
+
+.define PPUDATA $2007
+
+.define APU_PULSE1_CTRL	$4000
+.define APU_PULSE1_RAMP	$4001
+.define APU_PULSE1_FINE_TUNE	$4002
+.define APU_PULSE1_COARSE_TUNE	$4003
+
+.define APU_PULSE2_CTRL	$4004
+.define APU_PULSE2_RAMP	$4005
+.define APU_PULSE2_FINE_TUNE	$4006
+.define APU_PULSE2_COARSE_TUNE	$4007
+
+.define APU_TRIANGLE_CTRL1	$4008
+.define APU_TRIANGLE_CTRL2	$4009
+.define APU_TRIANGLE_FINE_TUNE	$400a
+.define APU_TRIANGLE_COARSE_TUNE	$400b
+
+.define APU_NOISE_CTRL	$400c
+.define APU_NOISE_FINE_TUNE	$400e
+.define APU_NOISE_COARSE_TUNE	$400f
+
+.define APU_DELTA_CTRL	$4010
+.define APU_DELTA_DA	$4011
+.define APU_DELTA_ADDR	$4012
+.define APU_DELTA_LENGTH	$4013
+
+.define SPRITE_DMA	$4014
+
+.define APU_CLOCK_SIGNAL	$4015
+  .define APU_CLOCK_SIGNAL_IRQ_AVAIL			1 << 6
+  .define APU_CLOCK_SIGNAL_DELTA			1 << 4
+  .define APU_CLOCK_SIGNAL_NOISE			1 << 3
+  .define APU_CLOCK_SIGNAL_TRIANGLE			1 << 2
+  .define APU_CLOCK_SIGNAL_PULSE2			1 << 1
+  .define APU_CLOCK_SIGNAL_PULSE1			1 << 0
+
+.define JOYPAD1	$4016
+  .define JOYPAD_VCLOCK_EXT			1 << 7
+  .define JOYPAD_VCLOCK_INT			1 << 6
+  .define JOYPAD_ZAPPER_TRIGGER			1 << 4
+  .define JOYPAD_ZAPPER_HIT			1 << 3
+  .define JOYPAD_DATA			1 << 0
+  .define JOYPAD_STROBE			1 << 0
+  .define JOYPAD_EXP_DIR			1 << 0
+
+.define JOYPAD2	$4017

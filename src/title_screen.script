@@ -1,0 +1,170 @@
+
+	SCRIPT title_screen
+.ACCU 16
+.INDEX 16
+
+  .def objBackground hashPtr.1
+  .def objLogo hashPtr.2
+  .def objBrightness hashPtr.3
+  .def objSpc hashPtr.4
+  .def objLogoZoom hashPtr.5
+  .def objSuper hashPtr.6
+  .def objText hashPtr.7
+  .def objPalRotate hashPtr.8
+  .def objPlayer hashPtr.9
+  .def irq.buffer.x this._tmp
+  .def irq.buffer.y this._tmp + 2
+
+  ;EVENT Event.confirm.CLS.PTR $0000 $0164 EventResult.playchapter main_menu 0 0 0
+  NEW Brightness.CLS.PTR objBrightness
+
+  lda #BRIGHTNESS.NONE
+  CALL Brightness.set.MTD objBrightness 
+
+  lda.w #OBJECT.PROPERTIES.isChapter
+  jsr abstract.Iterator.setProperties
+  jsr abstract.Iterator.killOthers
+
+  lda.w #OBJECT.PROPERTIES.isEvent
+  jsr abstract.Iterator.kill.byProperties
+
+  lda.w #OBJID.Msu1
+  jsr abstract.Iterator.kill.byId
+
+  sep #$20
+  lda.b #BGMODE_MODE_1 | BGMODE_PRIORITY_LAYER_3
+  sta.w ScreenMode
+  lda.w MainScreen
+  and.b #(T_BG1_ENABLE | T_BG2_ENABLE | T_BG3_ENABLE | T_BG4_ENABLE) ~$ff
+  ;ora.b #T_BG1_ENABLE
+  sta.w MainScreen
+  rep #$31
+
+  NEW Background.textlayer.8x8.CLS.PTR objText
+  NEW Background.generic.CLS.PTR objBackground BG.LAYER.1 BG.titlescreen.PTR
+  NEW Background.generic.CLS.PTR objLogo BG.LAYER.0 BG.logo.PTR
+  
+  NEW LogoZoom.CLS.PTR objLogoZoom BG.LAYER.0
+  NEW Spc.CLS.PTR objSpc
+
+  lda #T_title.PTR
+  CALL Background.textlayer.8x8.print.MTD objText
+  CALL Background.textlayer.8x8.flush.MTD objText
+
+  lda #BRIGHTNESS.FULL
+  CALL Brightness.fadeTo.MTD objBrightness 
+
+  NEW Player.CLS.PTR objPlayer
+  CALL Player.reset.MTD objPlayer
+
+  jsr core.irq.position.get
+  stx irq.buffer.x
+  sty irq.buffer.y
+
+  ldy #213
+  jsr core.irq.position.set
+
+  jsr SavePC
+
+  ;wait for logo zoomer to finish
+  jsr abstract.Iterator.reset
+-	lda #OBJID.LogoZoom
+	jsr abstract.Iterator.each.byId
+	bcc +
+	  rts
++
+
+  CALL Background.generic.getAllocatedPalette.MTD objLogo
+  bcs +
+    TRIGGER_ERROR E_Todo  ;@fixme, need proper error message here if no palette allocated
+
++
+  ;color index to start from, minus transparent color 0
+  pea 0
+  pea 0
+  tya
+  lsr a
+  dec a
+  dec a
+  pha
+  txa
+  lsr a
+  inc a
+  inc a
+  pha
+  NEW Palette.rotate.CLS.PTR objPalRotate
+  pla
+  pla
+  pla
+  pla
+
+  lda.w #SAMPLE.0.SHURIKEN
+  CALL Spc.SpcPlaySoundEffect.MTD objSpc
+
+  NEW Sprite.super.CLS.PTR objSuper 0 0
+
+  jsr SavePC
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #(JOY_BUTTON_A | JOY_BUTTON_START)
+  beq +
+	rts
++
+
+  jsr SavePC
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #(JOY_BUTTON_A | JOY_BUTTON_START)
+  bne +
+    rts
+
++
+  lda.w #SAMPLE.0.TECHNIQUE
+  CALL Spc.SpcPlaySoundEffect.MTD objSpc
+  ;lda.w #Song.start.PTR
+  ;CALL Spc.playSong.MTD objSpc
+
+
+  NEW Pause.CLS.PTR oopCreateNoPtr
+
+
+  lda #BRIGHTNESS.NONE
+  CALL Brightness.fadeTo.MTD objBrightness
+
+  jsr SavePC
+  CALL Brightness.isDone.MTD objBrightness
+
+  bcs +++
+    rts
+
++++
+  CALL Sprite.super.kill.MTD objSuper
+  CALL Background.generic.kill.MTD objBackground
+  CALL Background.generic.kill.MTD objLogo
+
+  CALL Background.textlayer.8x8.kill.MTD objText
+  ldx #objPalRotate
+  jsr oop.object.exists
+  bcc ++
+    CALL Palette.rotate.kill.MTD objPalRotate
+
+++
+  ;debug, extremely bad hack!!! whats the real reason vram cant be assigned when logo sprite has been created?
+  jsr core.vram.init
+
+  lda.w #OBJECT.PROPERTIES.isHdma
+  jsr abstract.Iterator.kill.byProperties
+
+  ldx irq.buffer.x
+  ldy irq.buffer.y
+  jsr core.irq.position.set
+
+  jsr core.cgram.clear
+
+  NEW Script.CLS.PTR oopCreateNoPtr level1
+  ;NEW Script.CLS.PTR oopCreateNoPtr level_complete1
+
+  rts
+  DIE
+
+

@@ -1,0 +1,48 @@
+/**
+* score container
+*/
+.include "src/object/player/score.h"
+.section "score"
+
+  /**
+  * create score with input values
+  *
+  * @param 1 <int,16bit>	score value
+  * @param 2 <char,16bit>	name 1
+  * @param 3 <char,16bit>	name 2
+  */
+  METHOD init
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  sta.b this.score
+  lda OBJECT.CALL.ARG.2,s
+  sta.b this.name
+  lda OBJECT.CALL.ARG.3,s
+  sta.b this.name+2
+  rts
+
+  /**
+  * @return a <int,16bit>	score value
+  */
+  METHOD getScore
+  php
+  rep #$31
+  lda this.score
+  plp
+  rts
+
+  /**
+  * @return a <char,16bit>	name 1
+  * @return x <char,16bit>	name 2
+  */
+  METHOD getName
+  php
+  rep #$31
+  lda this.name
+  ldx this.name+2
+  plp
+  rts
+
+  CLASS Score getScore getName
+.ends	
+	

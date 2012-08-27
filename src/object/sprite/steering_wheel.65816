@@ -1,0 +1,95 @@
+/**
+* steering wheel sprite
+* 
+* @param a<int, 16bit>  x-pos
+* @param 1<int, 16bit>  y-pos
+*/
+.include "src/object/sprite/steering_wheel.h"
+.section "SteeringWheel"
+
+  METHOD init
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  sta.b dimension.position.x + 1
+
+  lda OBJECT.CALL.ARG.2,s
+  sta.b dimension.position.y + 1
+
+  sep #$20
+  lda.b #$1
+  sta.b animation.isLooping
+
+  lda.b #$1f
+  sta.b animation.speed
+
+  lda #SPRITE.steering_wheel.normal.PTR
+  jsr abstract.Sprite.startAnimation
+
+  rts
+
+  METHOD play
+  rep #$31
+
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.press
+  and.w #(JOY_DIR_LEFT | JOY_DIR_RIGHT)
+  xba
+  asl a
+  tax
+  jsr (steeringWheelStateLUT,x)
+
+  jsr abstract.Sprite.playAnimation
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr abstract.Sprite.deallocate
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+_straight:
+  cpx this.currentState
+  beq +
+	lda #SPRITE.steering_wheel.normal.PTR
+	phx
+	jsr abstract.Sprite.startAnimation
+	plx
+
++ stx this.currentState
+  rts
+
+_left:
+  cpx this.currentState
+  beq +
+	lda #SPRITE.steering_wheel.left.PTR
+	phx
+	jsr abstract.Sprite.startAnimation
+	plx
+
++ stx this.currentState
+  rts
+
+_right:
+  cpx this.currentState
+  beq +
+	lda #SPRITE.steering_wheel.right.PTR
+	phx
+	jsr abstract.Sprite.startAnimation
+	plx
+
++ stx this.currentState
+  rts
+
+_void:
+  rts
+
+steeringWheelStateLUT:
+  .dw _straight
+  .dw _right
+  .dw _left
+  .dw _void	;actually, this shouldnt be possible (both directions pressed)
+
+  CLASS SteeringWheel
+.ends	
+	

@@ -1,0 +1,48 @@
+<chapter>
+	<timeline>
+		<timestart min="2" second="14" ms="381"/>	
+		<timeend min="2" second="21" ms="381"/>			
+	</timeline>
+
+	<params>
+		<str key="controller" value="game"/>
+		<int key="cockpit" value="1"/>
+		<int key="level" value="1"/>
+		
+		<!-- Debug stuff -->
+		<int key="godmode" value="1"/>
+		<int key="cursorSpeed" value="650"/>
+		<int key="analogControls" value="1"/>		
+	</params>	
+	
+<!-- Local Macros Override Global Macros -->	
+	<macros>
+	</macros>
+	
+	
+	<events>
+
+<!-- Start level checkpoint -->		
+		<event type="checkpoint">
+			<timeline>
+				<timestart min="2" second="14" ms="381"/>
+			</timeline>
+		</event>
+
+    <!-- hide dash -->        
+		<event type="hide-dash">
+			<timeline>
+				<timestart min="2" second="14" ms="381"/>
+				<timeend min="2" second="21" ms="381"/>
+			</timeline>
+		</event>
+
+	</events>
+
+	<result>
+		<playchapter name="level1_checkpoint1"/>
+	</result>
+</chapter>
+
+
+

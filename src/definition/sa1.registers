@@ -1,0 +1,129 @@
+;SA-1 register definitions
+
+.define CCNT $2200						;sa1 cpu control
+	.define CCNT_SA1_CPU_IRQ			1 << 7
+	.define CCNT_SA1_CPU_READY			1 << 6
+	.define CCNT_SA1_CPU_RESET			1 << 5
+	.define CCNT_SA1_CPU_NMI			1 << 4
+	.define CCNT_MESSAGE_TO_SA1			$f
+
+.define SIE $2201						;snes int enable
+	.define SIE_CPU_IRQ_ENABLE			1 << 7
+	.define SIE_CHARCONV_IRQ_ENABLE		1 << 5
+
+.define SIC $2202						;snes int clear
+	.define SIC_SA1_IRQ_CLEAR			1 << 7
+	.define SIC_CHARCONV_IRQ_CLEAR		1 << 5
+
+.define CRV $2203						;sa1 reset vector
+.define CNV $2205						;sa1 nmi vector
+.define CIV $2207						;sa1 irq vector
+.define SCNT $2209						;snes cpu control
+	.define SCNT_SNES_CPU_IRQ			1 << 7
+	.define SCNT_SNES_IRQ_VECTOR		1 << 6
+	.define SCNT_SNES_NMI_VECTOR		1 << 4
+	.define SCNT_MESSAGE_TO_SNES		$f
+
+.define CIE $220a						;snes cpu int enable
+	.define CIE_IRQ_SNES2SA1_ENABLE		1 << 7
+	.define CIE_IRQ_TIMER2SA1_ENABLE	1 << 6
+	.define CIE_IRQ_DMA2SA1_ENABLE		1 << 5
+	.define CIE_NMI_SNES2SA1_ENABLE		1 << 4
+
+.define CIC $220b						;snes cpu int clear
+	.define CIC_IRQ_SNES2SA1_CLEAR		1 << 7
+	.define CIC_IRQ_TIMER2SA1_CLEAR		1 << 6
+	.define CIC_IRQ_DMA2SA1_CLEAR		1 << 5
+	.define CIC_NMI_SNES2SA1_CLEAR		1 << 4
+
+.define SNV $220c						;snes cpu nmi vector
+.define SIV $220e						;snes cpu irq vector
+.define TMC $2210						;h/v timer control
+.define CTR $2211						;sa1 cpu timer restart
+.define HCNT $2212						;set h-count
+.define VCNT $2214						;set v-count
+.define CXB $2220						;set mmc banks
+.define DXB $2221
+.define EXB $2222
+.define FXB $2223
+.define BMAPS $2224						;snes bw-ram window at banks $00-$3f/$80-$bf:6000-$7fff
+.define BMAP $2225						;sa1 bw-ram window at banks $00-$3f/$80-$bf:6000-$7fff
+.define SBWE $2226						;snes bw-ram enable
+	.define SBWE_SNES_BWRAM_WRITE_ENABLE 1 << 7
+
+.define CBWE $2227						;sa1 bw-ram enable
+	.define CBWE_SA1_BWRAM_WRITE_ENABLE 1 << 7
+.define BWPA $2228						;snes bw-ram write protect blocks
+	.define BWPA_PROTECT_BWRAM_2K		0
+	.define BWPA_PROTECT_BWRAM_4K		1
+	.define BWPA_PROTECT_BWRAM_8K		2
+	.define BWPA_PROTECT_BWRAM_16K		3
+	.define BWPA_PROTECT_BWRAM_32K		4
+	.define BWPA_PROTECT_BWRAM_64K		5
+	.define BWPA_PROTECT_BWRAM_128K		6
+	.define BWPA_PROTECT_BWRAM_256K		7
+	.define BWPA_PROTECT_BWRAM_512K		8
+	.define BWPA_PROTECT_BWRAM_1M		9
+	.define BWPA_PROTECT_BWRAM_2M		10
+
+.define SIWP $2229						;snes i-ram write protect blocks
+.define CIWP $222a						;sa1 i-ram write protect blocks
+.define DCNT $2230						;dma control
+	.define DCNT_DMA_ENABLE				1 << 7
+	.define DCNT_DMA_HAS_PRIORITY		1 << 6
+	.define DCNT_DMA_MODE				1 << 5
+	.define DCNT_CHARCONV_MODE			1 << 4
+	.define DCNT_DMA_DESTINATION		1 << 2
+	.define DCNT_DMA_SOURCE_ROM			0
+	.define DCNT_DMA_SOURCE_BWRAM		1
+	.define DCNT_DMA_SOURCE_IRAM		2
+
+.define CDMA $2231						;character conversion config
+	.define CDMA_CHARCONV_END			1 << 7
+	.define CDMA_8BPP					0
+	.define CDMA_4BPP					1
+	.define CDMA_2BPP					2
+	.define CDMA_TILES_PER_ROW_1		0 << 2
+	.define CDMA_TILES_PER_ROW_2		1 << 2
+	.define CDMA_TILES_PER_ROW_4		2 << 2
+	.define CDMA_TILES_PER_ROW_8		3 << 2
+	.define CDMA_TILES_PER_ROW_16		4 << 2
+	.define CDMA_TILES_PER_ROW_32		5 << 2
+
+.define SDA $2232						;dma source
+.define DDA $2235						;dma target
+.define DTC $2238						;dma transfer size
+.define BBF $223f						;bw-ram bitmap format
+	.define BBF_4BPP					0 << 7
+	.define BBF_2BPP					1 << 7
+
+.define BRF $2240						;bitmap register
+.define MCNT $2250						;math control
+	.define MCNT_MULTIPLICATION			0
+	.define MCNT_DIVISION				1
+	.define MCNT_CUMULATIVE_SUM			2
+
+.define MA $2251						;multiplicand/dividend
+.define MB $2253						;multiplier/divisor
+.define VBD $2258						;variable bitlength config
+.define VDA $2259						;variable length bit rom source
+.define SFR $2300						;snes cpu flag read
+	.define SFR_IRQ_FROM_SA1			1 << 7
+	.define SFR_SNES_IRQ_VECTOR			1 << 6
+	.define SFR_CHARCONV_READY			1 << 5
+	.define SFR_SNES_NMI_VECTOR			1 << 4
+	.define SFR_MESSAGE_TO_SNES			$f
+
+.define CFR $2301						;sa1 cpu flag read
+	.define CFR_IRQ_FROM_SNES			1 << 7
+	.define CFR_IRQ_FROM_TIMER			1 << 6
+	.define CFR_IRQ_END					1 << 5
+	.define CFR_NMI_FROM_SNES			1 << 4
+	.define CFR_MESSAGE_FROM_SNES		$f
+
+.define HCR $2302						;hcount read
+.define VCR $2304						;vcount read
+.define MR $2306						;math result
+.define OF $230b						;math overflow
+.define VDP $230c						;variable length readport
+.define VC $230e						;version code

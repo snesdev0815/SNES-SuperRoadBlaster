@@ -1,0 +1,84 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/unit_test/test_object.h"
+.section "test_object"
+
+  METHOD init
+  .ACCU 16
+  .INDEX 16
+  rep #$31
+  cmp #789
+  bne +
+  lda OBJECT.CALL.ARG.1,s
+  cmp #$aaaa
+  bne +
+  lda OBJECT.CALL.ARG.2,s
+  cmp #$5555
+  bne +
+  lda OBJECT.CALL.ARG.3,s
+  cmp #1
+  bne +
+  lda OBJECT.CALL.ARG.4,s
+  cmp #2
+  bne +
+  lda OBJECT.CALL.ARG.5,s
+  cmp #3
+  bne +
+  lda OBJECT.CALL.ARG.6,s
+  cmp #4
+  bne +
+
+  lda OBJECT.CALL.ARG.7,s
+  cmp #5
+  bne +
+  lda OBJECT.CALL.ARG.8,s
+  cmp #6
+  bne + 
+
+  sec
+  rts
+
++ brk
+  stp
+
+
+
+  METHOD testParameterReturn
+  .ACCU 16
+  .INDEX 16
+  rep #$31
+  cmp #7
+  bne +
+  lda OBJECT.CALL.ARG.1,s
+  cmp #$aaaa
+  bne +
+  lda OBJECT.CALL.ARG.2,s
+  cmp #$5555
+  bne +
+  lda OBJECT.CALL.ARG.3,s
+  cmp #1
+  bne +
+  lda OBJECT.CALL.ARG.4,s
+  cmp #2
+  bne +
+  lda OBJECT.CALL.ARG.5,s
+  cmp #3
+  bne +
+  lda OBJECT.CALL.ARG.6,s
+  cmp #4
+  bne +
+
+  lda.w #$1234
+  ldy.w #$5678
+  ldx.w #$9abc
+  sec
+  rts
+
++ clc
+  rts
+
+  CLASS Test_object testParameterReturn
+.ends	
+	

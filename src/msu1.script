@@ -1,0 +1,98 @@
+
+	SCRIPT msu1
+.ACCU 16
+.INDEX 16
+
+  .def msu1Bg hashPtr.1
+
+  NEW Brightness.CLS.PTR hashPtr.2
+  lda #BRIGHTNESS.NONE
+  CALL Brightness.set.MTD hashPtr.2 
+
+  lda.w #OBJECT.PROPERTIES.isChapter
+  jsr abstract.Iterator.setProperties
+  jsr abstract.Iterator.killOthers
+
+  lda.w #OBJECT.PROPERTIES.isEvent
+  jsr abstract.Iterator.kill.byProperties
+
+  lda.w #OBJID.Msu1
+  jsr abstract.Iterator.kill.byId
+
+  lda.w #OBJID.Pause
+  jsr abstract.Iterator.kill.byId
+
+  sep #$20
+  lda.b #BGMODE_MODE_1
+  sta.w ScreenMode
+  lda.w MainScreen
+  and.b #(T_BG1_ENABLE | T_BG2_ENABLE | T_BG3_ENABLE | T_BG4_ENABLE) ~$ff
+
+  sta.w MainScreen
+
+  rep #$31
+  NEW Background.generic.CLS.PTR msu1Bg BG.LAYER.0 BG.msu1.PTR
+
+  lda #BRIGHTNESS.FULL
+  CALL Brightness.fadeTo.MTD hashPtr.2 
+
+  ;wait for screen to lighten up
+  jsr SavePC
+  CALL Brightness.isDone.MTD hashPtr.2 
+  bcs +
+	rts
++
+  jsr core.nmi.stop
+  NEW Spc.CLS.PTR hashPtr.3
+
+  lda.w #0
+  CALL Spc.SpcIssueSamplePackUpload.MTD hashPtr.3
+  jsr core.nmi.start
+
+  jsr SavePC
+
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #(JOY_BUTTON_A | JOY_BUTTON_START)
+  beq +
+	rts
++
+
+  jsr SavePC
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #(JOY_BUTTON_A | JOY_BUTTON_START)
+  bne ++++
+	lda.w #SCRIPT.MAX_AGE.DEFAULT
+	jsr abstract.Script.ageExceeded
+	bcc +
+
+++++
+	lda #BRIGHTNESS.NONE
+	CALL Brightness.fadeTo.MTD hashPtr.2
+
+	jsr SavePC
+	CALL Brightness.isDone.MTD hashPtr.2
+	bcs +++
+	  rts
+
++++
+	ldx #INPUT.DEVICE.ID.0
+	jsr core.input.get.trigger
+	and.w #(JOY_BUTTON_A | JOY_BUTTON_START)
+	beq ++
+	  rts
+++
+	CALL Background.generic.kill.MTD msu1Bg
+
+    jsr core.cgram.clear
+
+	NEW Script.CLS.PTR oopCreateNoPtr logo_intro
+
+    
+    DIE
++ 
+
+  rts
+
+

@@ -1,0 +1,365 @@
+/**
+* cgram(color palette) allocation manager
+*
+* statically assigning color palettes sucks, because it hinders flexibility, code reusability and space usage.
+* that's why this handler dynamically allocates and manages available palette space.
+* 
+* feature outline:
+*   -cgram is divided into equal allocation blocks ($40 x 8 bytes(note that cgram is adressed word-wise, so these 8 bytes translate to 4 different cgram adresses))
+*   -routines may request allocated memory by specifying desired start(section), length, stepsize. if no block with desired criteria can be found, this is reported back.
+*   -allocator seeks free blocks, if successful allocates them with allocation id, clears newly-allocated cgram to 0 and returns id to calling routine for later reference
+*   -deallocation: routines supply allocation id, allocator frees all allocated blocks with said id.
+*   -id is one byte, sequential. hopefully we can get away with just incrementing id on every call
+*   -all supplied adresses lengths are real adresses, not /2 for cgram or anything like that(handled internally)
+*   -block format: $40 * 8 blocks. 0 denotes empty block
+* 
+* routines:
+* -init:
+*   -clear allocation blocks
+*   -clear id
+* 
+* -allocateCgram:(param a: stepsize(word, $40-$4000), x: length(word), y: start(word). returns: a: id, x:start
+*   -start at 0, check if free
+* 	-if free mark temp.start, check next block until temp.length is satisfied(decrease temp.length by blocksize each step)
+* 	-if not, advance by stepsize, reset temp.start, temp.length, try again.
+* 	-if adress wraps around, return false
+*   -if free space was found, fetch id, mark all blocks from temp.start through temp.length as blocked, then return real adress/length & id to caller
+*   -dont clear cgram implicitly, caller has to do that himself(or just use don't care about previous data)
+*	-special case: maximum step amout is stepsize*8(because max palette id is 8)
+*	-return palette id (start adress/stepsize)
+* 
+* 
+* -deallocateCgram:(param a: id)
+*   -walk all blocks, clear block to 0 where id = input id.
+*   -if no block was found, something went wrong(issue exception)
+*   
+*
+*/
+
+
+.include "src/core/allocate_cgram.h"
+.section "allocate_cgram"
+
+/**
+*
+*/
+core.cgram.init:
+  php
+  rep #$31
+  sep #$20
+  lda #0
+  ldy.w #CGRAM_ALLOCATE.GLOBAL.END - CGRAM_ALLOCATE.GLOBAL.START
+  ldx.w #CGRAM_ALLOCATE.GLOBAL.START
+  jsr ClearWRAM
+  stz.w GLOBAL.currentCgramAllocationId
+  plp
+  rts
+
+/**
+*
+*/
+_allocateCgramBadStepsize:
+  pha
+  TRIGGER_ERROR E_CGallocBadStepsize
+  stp
+
+/**
+* attempt allocating desired cgram space
+*
+* @param a <int,16bit>	stepsize ($8 - $100). most palettes must be boundary-aligned, that's why this is needed
+* @param x <int,16bit>	desired size of allocated block in bytes.
+* @param y <int,16bit>	desired start position of allocated block in bytes. different cgram areas are mapped to different functions(2bpp layers, translucent sprites etc.)
+*
+* @return a <int,8bit>	allocation block id
+* @return x <int,16bit>	cgram start adress
+* @return c <bool>	true if allocation succeeded
+*/
+core.cgram.allocate:
+  php
+  rep #$31
+  cmp.w #CGRAM_ALLOCATION_STEP.MIN
+  bcc _allocateCgramBadStepsize
+
+  cmp.w #CGRAM_ALLOCATION_STEP.MAX + 1
+  bcs _allocateCgramBadStepsize
+
+  sta.w GLOBAL.cgramAllocation.input.stepsize
+  asl a
+  asl a
+  asl a
+  sta.w GLOBAL.cgramAllocation.max.length
+  cpx.w #0
+  bne +
+    TRIGGER_ERROR E_CGallocInvalidLength
+
+
++ stx.w GLOBAL.cgramAllocation.input.length
+  stx.w GLOBAL.cgramAllocation.temp.length
+  tya
+  sta.w GLOBAL.cgramAllocation.input.start
+  sta.w GLOBAL.cgramAllocation.temp.start
+  lsr a
+  lsr a
+  lsr a
+  cmp.w #CGRAM_ALLOCATION_BLOCKS
+  bcc +
+	pha
+    TRIGGER_ERROR E_CGallocInvalidStart
+
+
++ jsr _allocateCgramSeekFreeBlocks
+  bcs +
+	;allocation failed, not enough cgram space left
+	plp
+	clc
+	rts
++ sep #$20
+  inc.w GLOBAL.currentCgramAllocationId
+  bne +
+    ;allocation id must be non-zero
+    inc.w GLOBAL.currentCgramAllocationId
+    
++ 
+-
+  lda.w GLOBAL.currentCgramAllocationId
+  jsr _isIdInUse
+  bcc +
+    inc.w GLOBAL.currentCgramAllocationId
+    bra -
+
++  
+  lda.w GLOBAL.currentCgramAllocationId
+  jsr _markAllocatedCgramBlocks
+
+  ldx.w GLOBAL.cgramAllocation.temp.start
+
+  plp
+  sec
+  rts
+
+/**
+* go through cgram blocks check if input id is already used
+*
+* @param a<int,8bit>  block id
+* @return carry<bool>   true if block id already in use
+*
+*/
+_isIdInUse:
+  php
+  rep #$31
+  phx
+  sep #$20
+
+  ldx.w #CGRAM_ALLOCATION_BLOCKS
+-   cmp.w GLOBAL.cgramAllocationBlocks,x
+    bne +
+
+      plx
+      plp
+      sec
+      rts
++   dex
+    bpl -
+
+  rep #$31
+
+  plx
+  plp
+  clc
+  rts
+  
+  
+/**
+* go through cgram blocks and return block start adress if successful
+*
+* @return carry<bool>	true if free block area found
+* @return y<int,16bit>	block start id
+*
+*/
+_allocateCgramSeekFreeBlocks:
+  php
+  rep #$31
+
+  lda.w GLOBAL.cgramAllocation.temp.start
+  lsr a
+  lsr a
+  lsr a
+  ;and.w #CGRAM_ALLOCATION_BLOCKS - 1
+  tay
+  ;ldy.w #0
+  ;stz.w GLOBAL.cgramAllocation.temp.start
+
+_allocateCgramSeekLoop:
+  lda.w GLOBAL.cgramAllocationBlocks,y
+  and.w #$ff
+  beq _allocateCgramBlockFree
+
+	;block is occupied, reset length counter
+	lda.w GLOBAL.cgramAllocation.input.length
+	sta.w GLOBAL.cgramAllocation.temp.length
+
+	;advance to next block according to stepsize
+	lda.w GLOBAL.cgramAllocation.temp.start
+	clc
+	adc.w GLOBAL.cgramAllocation.input.stepsize
+	sta.w GLOBAL.cgramAllocation.temp.start
+	lsr a
+	lsr a
+	lsr a
+	cmp.w #CGRAM_ALLOCATION_BLOCKS
+	bcc +
+	  ;allocation failed, end of cgram reached
+	  plp
+	  clc
+	  rts
+
++	tay
+	bra _allocateCgramSeekLoop
+
+_allocateCgramBlockFree:
+  iny
+  cpy.w #CGRAM_ALLOCATION_BLOCKS + 1
+  bne +
+	;allocation failed, end of cgram reached
+	plp
+	clc
+	rts
+
++ lda.w GLOBAL.cgramAllocation.temp.length
+  sec
+  sbc.w #CGRAM_ALLOCATION_BLOCKSIZE
+  sta.w GLOBAL.cgramAllocation.temp.length
+  beq +
+  bcs _allocateCgramSeekLoop
+
++ lda.w GLOBAL.cgramAllocation.temp.start
+  clc
+  adc.w GLOBAL.cgramAllocation.input.length
+  sec
+  sbc.w GLOBAL.cgramAllocation.input.start
+  cmp.w GLOBAL.cgramAllocation.max.length
+  beq +
+  bcc +
+	;allocation failed, allocation block exceeds 8 palettes from start adress
+	plp
+	clc
+	rts
+
+;allocation successful
++ plp
+  sec
+  rts
+
+/**
+* mark allocated cgram blocks with allocation id
+*
+* @param a<int,8bit>	allocation id
+* @param y<int,16bit>	start block id
+*/
+_markAllocatedCgramBlocks:
+  php
+  rep #$31
+  pha
+
+  lda.w GLOBAL.cgramAllocation.temp.start
+  lsr a
+  lsr a
+  lsr a
+  tay
+
+  lda.w GLOBAL.cgramAllocation.input.length
+  ;half-occupied blocks present? will occupy full block
+  bit.w #%111
+  beq +
+	clc
+	adc.w #%1000
++ 
+  lsr a
+  lsr a
+  lsr a
+  tax
+  pla
+  sep #$20
+-	sta.w GLOBAL.cgramAllocationBlocks,y
+	iny
+	dex
+	bne -
+
+  plp
+  rts
+
+/**
+* deallocate cgram blocks.
+*
+* @param a<int,8bit>	allocation id of blocks to be deallocated
+* @return c<bool>   set if deallocation was successful
+*/
+core.cgram.deallocate:
+  php
+  rep #$31
+  phx
+  sep #$20
+  cmp.w GLOBAL.currentCgramAllocationId
+  bne +
+	dec.w GLOBAL.currentCgramAllocationId
++ pea 0
+
+  ldx.w #CGRAM_ALLOCATION_BLOCKS
+-	cmp.w GLOBAL.cgramAllocationBlocks,x
+	bne +
+	  sta 1,s
+	  stz.w GLOBAL.cgramAllocationBlocks,x
++	dex
+	cpx.w #$ffff
+	bne -
+
+  rep #$31
+  tax
+  pla
+  bne +
+	;hits if someone tries to deallocate id 0(already empty block) or if there were no blocks that could be deallocated for given id
+/*
+	phx
+    TRIGGER_ERROR E_CGallocEmptyDeallocation
+
+*/
+    plx
+    plp
+    clc
+    rts
+    
++ plx
+  plp
+  sec
+  rts
+
+/**
+* clears whole cgram to black color
+*
+*/
+core.cgram.clear:
+  php
+  rep #$31
+  sep #$20  
+  tsx
+  lda #DMA_TRANSFER.CGRAM | DMA_TRANSFER.OPTION.FIXED_SOURCE        ;transfer type
+  pha
+  ;pea MSU_DATA  ;source adress
+  pea _core.cgram.clear.pattern ;source adress
+  lda :_core.cgram.clear.pattern        ;source bank
+  pha
+
+  
+  pea 0 ;cgram target adress
+
+  pea CGRAM_ALLOCATION_STEP.MAX ;size
+
+  jsr core.dma.registerTransfer
+  txs
+  plp
+  rts
+
+_core.cgram.clear.pattern:
+  .dw 0
+  
+.ends

@@ -1,0 +1,467 @@
+;self-contained string printer
+.include "src/core/string.h"
+.section "core.string"	
+
+/**
+* print string
+*
+* @param a<int,8bit>	string pointer id (@see TextstringLUT)
+*/
+core.string.parse:
+  php
+  phb
+  phd
+  pea ZP
+  pld
+  pea RAM << 8
+  plb
+  plb
+  rep #$31
+  and #$ff
+  jsr _StrPointer
+
+  lda 7,s	;get (optional) arguments
+  sta.w GLOBAL.CORE.STRING.argument.0
+  lda 9,s
+  sta.w GLOBAL.CORE.STRING.argument.1
+  lda 11,s
+  sta.w GLOBAL.CORE.STRING.argument.2
+  lda 13,s
+  sta.w GLOBAL.CORE.STRING.argument.3
+  jsr _PrintLoop
+  pld
+  plb
+  plp
+  rts
+
+core.string.reset:
+  php
+  phb
+  phd
+  pea ZP
+  pld
+  pea RAM << 8
+  plb
+  plb
+  rep #$31
+  lda #0
+  jsr _setPosition
+  ;clear string screen buffer
+  lda #WRAM.CLEAR_PATTERN.STRING
+  ldy.w #GLOBAL.CORE.STRING.buffer.length
+  ldx.w #GLOBAL.CORE.STRING.buffer
+  jsr ClearWRAM
+  pld
+  plb
+  plp
+  rts
+
+;print string to vram port	
+_PrintLoop:
+	php
+	rep #$31
+	ldy #0		
+-		lda [tmp],y
+		and #$ff
+		cmp #' '	;lower than whitespace??
+		bcs _TilemapPrint
+			jsr PrintCmd
+		bcs +
+		bra -
+
+		_TilemapPrint:
+			;sta VMDATAL
+			ldx.w GLOBAL.CORE.STRING.buffer.pointer
+			sep #$20
+			sta.w GLOBAL.CORE.STRING.buffer,x
+			rep #$31
+			inc.w GLOBAL.CORE.STRING.buffer.pointer
+			iny
+			bra -
+
++	plp
+	rts
+	
+;puts 16bit a string pointer into tmp, 3 bytes
+_StrPointer:
+	php
+	rep #$31
+	cmp #T_max
+	bcc +
+	  _stringIdInvalid:
+	  lda.w #T_max	;error condition, but we can't raise it with current exception printer!
++
+	sta tmp
+	asl a
+	clc
+	adc tmp
+	tax
+	lda.l TextstringLUT,x
+	sta tmp
+	lda.l TextstringLUT+1,x
+	sta tmp+1
+	plp
+	rts		
+
+;sets vram adress to a/2	
+_setPosition:
+	pha
+	and #$1f
+	sta tmp+6		;left margin
+	pla
+	sta tmp+4		;screen position
+	sta.w GLOBAL.CORE.STRING.buffer.pointer
+;	sta VMADDL
+	rts
+	
+PrintCmd:
+	.accu 16
+	cmp.w #TC_max+1
+	bcs +	;this is an error, but we can hardly raise it because the error itself would be printed as a string
+	  asl a
+	  tax
+	  jsr (ExcStrCmdLut,x)	;get pointer to subroutine
++
+	rts
+	
+SUB_TC_end:
+	sec
+	rts
+	
+;recursively goto substring, input: number of textstring pointer, 2 bytes
+SUB_TC_sub:
+	lda tmp	;push current string pointer to stack
+	pha
+	lda tmp+2
+	pha
+	iny
+	phy			;push current string counter to stack	
+
+	lda [tmp],y	;get argument, substring to load
+	jsr _StrPointer	
+	jsr _PrintLoop
+
+	ply		;restore original string status
+	iny		;goto next string char
+	iny
+	pla
+	sep #$20
+	sta tmp+2
+	rep #$31
+	pla
+	sta tmp
+	clc
+	rts
+
+;recursively goto substring, indirect.(input: 16bit pointer to 16bit str_pointer_number in bank $7e.)	
+SUB_TC_iSub:
+	lda tmp	;push current string pointer to stack
+	pha
+	lda tmp+2
+	pha
+	iny
+	phy			;push current string counter to stack	
+
+	phb
+	sep #$20
+	lda #RAM
+	pha
+	plb
+	rep #$31
+	lda [tmp],y ;get argument, pointer to substring to load
+	tax
+	lda.l RAM << 16,x
+	plb
+	
+	jsr _StrPointer	
+	jsr _PrintLoop
+
+	ply		;restore original string status
+	iny
+	iny		;goto next string char
+	pla
+	sep #$20
+	sta tmp+2
+	rep #$31
+	pla
+	sta tmp
+	clc
+	rts
+
+;recursively goto substring, direct 24bit pointer to arbitrary string	
+SUB_TC_dSub:
+	lda tmp	;push current string pointer to stack
+	pha
+	lda tmp+2
+	pha
+	iny
+	phy			;push current string counter to stack	
+
+	lda [tmp],y ;get argument, pointer to substring to load
+	pha
+	iny
+	lda [tmp],y
+	sta tmp+1
+	pla
+	sta tmp
+
+	jsr _PrintLoop
+
+	ply		;restore original string status
+	iny
+	iny
+	iny		;goto next string char
+	pla
+	sep #$20
+	sta tmp+2
+	rep #$31
+	pla
+	sta tmp
+	clc
+	rts
+
+;recursively goto substring, indirect 16bit pointer to 24bit pointer to arbitrary string	
+SUB_TC_diSub:
+	lda tmp	;push current string pointer to stack
+	pha
+	lda tmp+2
+	pha
+	iny
+	phy			;push current string counter to stack	
+
+	phb
+	sep #$20
+	lda #RAM
+	pha
+	plb
+	rep #$31
+	lda [tmp],y ;get argument, pointer to substring-pointer to load
+	tax
+	lda.l RAM << 16,x
+	sta tmp
+	inx
+	lda.l RAM << 16,x
+	sta tmp+1
+	plb
+
+	jsr _PrintLoop
+
+	ply		;restore original string status
+	iny
+	iny		;goto next string char
+	pla
+	sep #$20
+	sta tmp+2
+	rep #$31
+	pla
+	sta tmp
+	clc
+	rts
+
+;set new screen position to write to
+SUB_TC_pos:
+	iny
+	lda [tmp],y ;get argument, new position
+	;and #$ff
+	jsr _setPosition
+	iny
+	iny
+	rts
+	
+SUB_TC_brk:
+	lda tmp+4
+	and #$FFE0		;mask off inline-position
+	clc
+	adc #$20		;advance to next line
+	clc
+	adc tmp+6		;include left margin
+	jsr _setPosition
+	iny		;goto next char
+	rts	
+
+;print decimal value. arg0: 24bit pointer to adress of hex value. arg1=length	in bytes(masked to $1f)
+SUB_TC_dToS:
+	lda tmp	;push current string pointer to stack
+	pha
+	lda tmp+2
+	pha
+	iny
+	phy			;push current string counter to stack	
+
+	lda [tmp],y ;get argument, pointer to word to print
+	sta tmp+10
+	iny
+	lda [tmp],y	;offfset high byte+bank
+	sta tmp+11
+	iny
+	iny
+	lda [tmp],y	;length
+	and #$3
+;	asl a				;*2, nibbles to print
+	sta tmp+8
+
+	jsr _convertToDecimal
+	jsr PrintHexToStack
+
+	ply		;restore original string status
+	iny
+	iny
+	iny
+	iny		;goto next string char
+	pla
+	sep #$20
+	sta tmp+2
+	rep #$31
+	pla
+	sta tmp
+	clc
+	rts
+
+;print decimal, 16bit only :(
+_convertToDecimal:
+;static decimal buffer tmp+15-18
+  .INDEX 16
+  rep #$31
+  
+  ldy #0
+  stz.b tmp+15
+  stz.b tmp+17
+
+  lda [tmp+10],y
+  ;convert one byte from hex to decimal
+  tax
+  lda #0
+  clc
+  php
+  sed
+
+-	adc #1
+	bcc +
+	  pha
+	  lda.b tmp+17
+	  adc #0
+	  sta.b tmp+17
+	  pla
++	dex
+	;bpl -
+	cpx.w #$ffff
+	bne -
+
+  plp
+  dec a
+  sta.b tmp+15
+  
+  ;setup string pointer
+  tdc
+  adc.w #tmp+15
+  stz tmp+11
+  sta tmp+10
+
+/*  ;update length, nibbles
+  lda #8
+  sta tmp+8*/
+  asl tmp+8
+  rts
+/*
+;hex to dec sample
+        TAX
+        DEX
+        BMI     ?BREAK
+        LDA     #0
+        CLC
+        PHP
+          SED
+
+?LOOP     ADC   #1
+          DEX
+          BPL   ?LOOP
+
+        PLP
+?BREAK  RTS
+*/
+
+;print hex value. arg0: 24bit pointer to adress of hex value. arg1=length	in bytes(masked to $1f)
+SUB_TC_hToS:
+	lda tmp	;push current string pointer to stack
+	pha
+	lda tmp+2
+	pha
+	iny
+	phy			;push current string counter to stack	
+
+	lda [tmp],y ;get argument, pointer to word to print
+	sta tmp+10
+	iny
+	lda [tmp],y	;offfset high byte+bank
+	sta tmp+11
+	iny
+	iny
+	lda [tmp],y	;length
+	and #$1f
+	asl a				;*2, nibbles to print
+	sta tmp+8		
+
+	jsr PrintHexToStack
+
+	ply		;restore original string status
+	iny
+	iny
+	iny
+	iny		;goto next string char
+	pla
+	sep #$20
+	sta tmp+2
+	rep #$31
+	pla
+	sta tmp
+	clc
+	rts
+
+PrintHexToStack:
+	tsc			;get stack pointer, use as pointer for string
+	sta tmp+13	;store stack buffer because we're going to fuck up the stack
+	pea TC_end		;push string terminator
+	ldy #0
+	PrintHexToStackLoop:
+		phy
+		tya
+		lsr a
+		tay
+		lda [tmp+10],y
+		bcc PrintHexToStackLo
+			and #$f0	;get high nibble
+			lsr a
+			lsr a
+			lsr a
+			lsr a
+			bra PrintNibbleToStack
+			
+		PrintHexToStackLo:
+			and #$0f				;get low nibble
+
+		PrintNibbleToStack:
+		ply
+		clc
+		adc #'0'	;shift to ASCII range
+		cmp #'9'+1
+		bcc PrintNibbleNoChar
+			adc #8-2	;shift into upper case letter range(-1 because of set carry, another -1 cause we're comparing '9'+1)
+		PrintNibbleNoChar:
+		sep #$20
+		pha		;print to stack
+		rep #$31
+		iny
+		cpy tmp+8
+		bcc PrintHexToStackLoop
+	
+	stz tmp+1	;save string pointer
+	tsc
+	inc a			;+1 because stack always points to next stack-slot
+	sta tmp
+	jsr _PrintLoop		
+
+	lda tmp+13	;restore stack
+	tcs	
+	rts
+
+.ends

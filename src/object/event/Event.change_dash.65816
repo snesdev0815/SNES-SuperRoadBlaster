@@ -1,0 +1,16 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/event/Event.change_dash.h"
+.section "Event.change_dash"
+
+  ;debug, kill immediately
+  METHOD play
+  rep #$31
+  CALL Event.change_dash.kill.MTD iterator.self
+  rts
+
+  CLASS Event.change_dash
+.ends	
+	

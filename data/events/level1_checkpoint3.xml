@@ -1,0 +1,346 @@
+<chapter>
+	<timeline>
+		<timestart min="3" second="03" ms="000"/>	
+		<timeend min="3" second="38" ms="350"/>			
+	</timeline>
+
+	<params>
+		<str key="controller" value="game"/>
+		<int key="cockpit" value="1"/>
+		<int key="level" value="1"/>
+		
+		<!-- Debug stuff -->
+		<int key="godmode" value="1"/>
+		<int key="cursorSpeed" value="650"/>
+		<int key="analogControls" value="1"/>		
+	</params>	
+	
+<!-- Local Macros Override Global Macros -->	
+	<macros>
+	</macros>
+	
+	
+	<events>
+
+    <!-- checkpoint -->
+		<event type="checkpoint">
+			<timeline>
+				<timestart min="3" second="03" ms="000"/>
+			</timeline>
+		</event>
+    
+	
+	<!--vibrate-->	
+		<event type="macro" name="vibrate1" >
+			<timeline>
+				<timestart min="3" second="05" ms="180"/>
+			</timeline>
+		</event>
+	
+    <!-- hide dash -->        
+		<event type="hide-dash">
+			<timeline>
+				<timestart min="3" second="05" ms="790"/>
+				<timeend min="3" second="07" ms="040"/>
+			</timeline>
+		</event>
+        
+
+	<!--13 accelerate-->
+		<event type="accelerate" automacro="accelerate">
+			<timeline>
+				<timestart min="3" second="07" ms="767"/>
+				<timeend min="3" second="08" ms="768"/>
+			</timeline>
+			<params>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>        
+
+
+	<!--vibrate-->	
+		<event type="macro" name="vibrate1" >
+			<timeline>
+				<timestart min="3" second="08" ms="680"/>
+			</timeline>
+		</event>
+		
+	<!--13 target-->
+		<event type="target">
+			<timeline>
+				<timestart min="3" second="07" ms="767"/>
+				<timeend min="3" second="08" ms="768"/>
+			</timeline>
+			<areas>
+				<area x="517" y="252" width="313" height="134"/>				
+			</areas>						
+			<params>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>        
+		
+	<!-- vibrate -->
+	    <event type="macro" name="vibrate1" >
+			<timeline>
+				<timestart min="3" second="09" ms="640"/>
+			</timeline>
+		</event>
+		
+	<!--14 accelerate-->
+		<event type="accelerate" automacro="accelerate">
+			<timeline>
+				<timestart min="3" second="09" ms="185"/>
+				<timeend min="3" second="09" ms="769"/>
+			</timeline>
+			<params>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>       
+
+	<!--14 target-->
+		<event type="target">
+			<timeline>
+				<timestart min="3" second="09" ms="185"/>
+				<timeend min="3" second="09" ms="769"/>
+			</timeline>
+			<areas>
+				<area x="485" y="233" width="183" height="130"/>				
+			</areas>									
+			<params>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>       
+
+
+	<!-- vibrate -->
+	    <event type="macro" name="vibrate1" >
+			<timeline>
+				<timestart min="3" second="10" ms="430"/>
+			</timeline>
+		</event>
+		       
+	<!--15 accelerate-->
+		<event type="accelerate" automacro="accelerate">
+			<timeline>
+				<timestart min="3" second="09" ms="894"/>
+				<timeend min="3" second="10" ms="478"/>
+			</timeline>
+			<params>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>             
+
+	<!--15 target-->
+		<event type="target">
+			<timeline>
+				<timestart min="3" second="09" ms="894"/>
+				<timeend min="3" second="10" ms="478"/>
+			</timeline>
+			<areas>
+				<area x="482" y="273" width="185" height="87"/>				
+			</areas>												
+			<params>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>             
+		                    
+     <!--16-->
+		<event type="direction" automacro="sharpright">
+			<timeline>
+				<timestart min="3" second="14" ms="523"/>
+				<timeend min="3" second="15" ms="441"/>
+			</timeline>
+			<params>
+				<str key="type" value="right"/>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>     
+        
+    <!-- hide dash -->        
+		<event type="hide-dash">
+			<timeline>
+				<timestart min="3" second="15" ms="670"/>
+				<timeend min="3" second="17" ms="130"/>
+			</timeline>
+		</event> 
+
+	<!-- rock -->
+		<event type="macro" name="rockfast">
+			<timeline>
+				<timestart min="3" second="15" ms="770"/>
+			</timeline>		
+		</event>
+
+	<!-- vibrate -->
+	    <event type="terrain-crash" automacro="crash">
+			<timeline>
+				<timestart min="3" second="17" ms="270"/>
+			</timeline> 
+		</event>        
+
+	<!-- vibrate -->
+	    <event type="terrain-crash" automacro="crash">
+			<timeline>
+				<timestart min="3" second="17" ms="270"/>
+			</timeline>
+		</event>     
+		   
+	<!-- vibrate -->
+	    <event type="terrain-crash" automacro="crash">
+			<timeline>
+				<timestart min="3" second="18" ms="690"/>
+			</timeline>
+		</event>        
+                 
+     <!--17-->
+		<event type="direction" automacro="sharpleft">
+			<timeline>
+				<timestart min="3" second="17" ms="818"/>
+				<timeend min="3" second="18" ms="736"/>
+			</timeline>
+			<params>
+				<str key="type" value="left"/>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash12"></playchapter>
+			</result>					
+		</event> 
+        
+     <!--18-->
+		<event type="direction" automacro="sharpright">
+			<timeline>
+				<timestart min="3" second="20" ms="821"/>
+				<timeend min="3" second="24" ms="164"/>
+			</timeline>
+			<params>
+				<str key="type" value="right"/>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash3"></playchapter>
+			</result>					
+		</event>      
+
+     <!--d4s-->
+        <event type="direction" automacro="sharpright">
+            <timeline>
+                <timestart min="3" second="27" ms="000"/>
+                <timeend min="3" second="28" ms="000"/>
+            </timeline>
+            <params>
+                <str key="type" value="right"/>
+                <int key="score" value="800"/>
+            </params>   
+            <result value="0">
+                <playchapter name="level1_crash1"></playchapter>
+            </result>                   
+        </event>
+        
+     <!--d4s-->
+        <event type="direction" automacro="sharpright">
+            <timeline>
+                <timestart min="3" second="29" ms="000"/>
+                <timeend min="3" second="30" ms="000"/>
+            </timeline>
+            <params>
+                <str key="type" value="right"/>
+                <int key="score" value="800"/>
+            </params>   
+            <result value="0">
+                <playchapter name="level1_crash1"></playchapter>
+            </result>                   
+        </event>
+     <!--21-->
+		<event type="direction" automacro="sharpleft">
+			<timeline>
+				<timestart min="3" second="31" ms="790"/>
+				<timeend min="3" second="32" ms="749"/>
+			</timeline>
+			<params>
+				<str key="type" value="left"/>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>      
+
+	<!-- vibrate -->
+	    <event type="soft-crash" automacro="crash">
+			<timeline>
+				<timestart min="3" second="35" ms="160"/>
+			</timeline>
+		</event>
+        
+      <!--22-->
+		<event type="direction" automacro="sharpleft">
+			<timeline>
+				<timestart min="3" second="35" ms="544"/>
+				<timeend min="3" second="36" ms="461"/>
+			</timeline>
+			<params>
+				<str key="type" value="left"/>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>  
+
+    <!--d4s-->
+        <event type="brake" automacro="brake" >
+            <timeline>
+                <timestart min="3" second="37" ms="000"/>
+                <timeend min="3" second="38" ms="255"/>
+            </timeline>
+            <params>
+                <int key="score" value="800"/>
+            </params>   
+            <result value="0">
+                <playchapter name="level1_crash5"></playchapter>
+            </result>                   
+        </event>
+
+      <!--23-->
+		<event type="direction" automacro="sharpleft">
+			<timeline>
+				<timestart min="3" second="37" ms="588"/>
+				<timeend min="3" second="38" ms="255"/>
+			</timeline>
+			<params>
+				<str key="type" value="left"/>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash5"></playchapter>
+			</result>					
+		</event>
+	</events>
+
+	<result>
+		<playchapter name="level1_checkpoint4"/>
+	</result>
+</chapter>
+

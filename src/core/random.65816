@@ -1,0 +1,62 @@
+.include "src/core/random.h"
+.section "rng"
+
+core.random.init:
+	rep #$31
+	lda #$1234			;seed RNG
+	sta.w GLOBAL.random1
+	lda #$55aa
+	sta.w GLOBAL.random3
+	rts
+
+
+/**
+* get random number(byte)
+*
+* @return a<int,8bit>	random number
+*/
+core.random.get:
+	php
+	sep #$20
+	lda.w GLOBAL.random3
+	sta.w GLOBAL.random4
+	lda.w GLOBAL.random2
+	sta.w GLOBAL.random3
+	lda.w GLOBAL.random1
+	sta.w GLOBAL.random2
+	cmp.w GLOBAL.random3
+	bmi +				;If R3>R2 Then Goto R3_Greater
+	
+	lda.w GLOBAL.random3
+	clc
+	adc.w GLOBAL.random4
+/*
+	clc
+	eor.w JoyPortBuffer&$ffff			;use button presses for rng aswell
+	eor.w JoyPortBuffer&$ffff+2
+	eor.w JoyPortBuffer&$ffff+4
+	eor.w JoyPortBuffer&$ffff+6
+	eor.w JoyPortBuffer&$ffff+8
+	eor.w JoyPortBuffer&$ffff+10
+	eor.w JoyPortBuffer&$ffff+12
+	eor.w JoyPortBuffer&$ffff+14
+	eor.w FrameCounter
+*/
+	sta.w GLOBAL.random1
+
+	plp
+	rts									 ;Return R1
+	
++:
+	clc
+	adc.w GLOBAL.random4
+	clc
+;	eor.w JoyPortBuffer&$ffff+8
+	eor.w FrameCounter
+
+	sta.w GLOBAL.random1
+	plp
+	rts									 ;Return R1
+
+.ends
+

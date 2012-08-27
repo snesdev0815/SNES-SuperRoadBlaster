@@ -1,0 +1,119 @@
+/**
+* bonus points sprite
+* this is a total hack, sprites are hardcoded instead of actually based on input score
+* 
+* @param a<int, 16bit>  x-pos
+* @param 1<int, 16bit>  y-pos
+*/
+.include "src/object/sprite/Sprite.score.h"
+.section "Sprite.score"
+
+  METHOD init
+  rep #$31
+
+  sta this.score
+  
+  lda OBJECT.CALL.ARG.1,s
+  sta.b dimension.position.x + 1
+
+  lda OBJECT.CALL.ARG.2,s
+  sta.b dimension.position.y + 1
+
+  NEW Player.CLS.PTR this.player
+  lda this.score
+  CALL Player.addToScore.MTD this.player
+  
+  ;get random horizontal speed, mask off a bit
+  jsr core.random.get
+  xba
+  jsr core.random.get
+  and.w #$1ff
+  sec
+  sbc.w #$ff
+  sta this.speed.x
+  
+  jsr core.random.get
+  and.w #$7f
+  clc
+  adc #-300
+  sta this.speed.y
+  stz this.accel
+  
+  lda #SPRITE.SCORE.MAX_AGE
+  sta this.age
+
+  
+  sep #$20
+  lda.b #$1
+  sta.b animation.isLooping
+
+  lda #$f
+  sta.b animation.speed
+  rts
+
+  METHOD play
+  rep #$31
+
+  ;kill after set time
+  dec this.age
+  beq _kill
+
+  ;stupid hack to prevent all of the vram transfers happening on the same frame
+  lda this.age
+  cmp #SPRITE.SCORE.MAX_AGE - 1
+  bne +
+    rts
+    
++
+  cmp #SPRITE.SCORE.MAX_AGE - 2
+  bne +
+    rts
+    
++
+  cmp #SPRITE.SCORE.MAX_AGE - 3
+  bne ++
+      lda #SPRITE.points.normal.PTR
+      ldx this.score
+      cpx #PLAYER.BONUS.EXTRA
+      bne +
+        pei (dimension.position.y + 1)
+        pei (dimension.position.x + 1)
+        NEW Sprite.bang.CLS.PTR oopCreateNoPtr
+        plx
+        plx
+        lda #SPRITE.points.extra.PTR
++
+
+    jsr abstract.Sprite.startAnimation
+    rts
+    
+++
+
+
+  jsr abstract.Sprite.playAnimation
+
+  lda this.speed.y
+  clc
+  adc this.accel
+  sta this.speed.y
+  inc this.accel
+  
+  ;let score fall down
+  pei (this.speed.y)
+  pei (this.speed.x)
+  CALL Sprite.score.translate.MTD iterator.self
+  pla
+  pla 
+ 
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr abstract.Sprite.deallocate
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+  CLASS Sprite.score
+.ends	
+	

@@ -1,0 +1,144 @@
+.include "src/core/input.h"
+.section "core.input"
+
+core.input.init:
+  php
+  rep #$31
+  sep #$20
+  stz.w CheckJoypadMode
+
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.reset
+  plp
+  rts
+
+/**
+* @param a<int,16bit> button mask
+* @param x<int,8bit> input device id
+*/
+core.input.setMask:
+  php
+  rep #$31
+  jsr _getInputDevicePointer
+  sta.w inputDevice.mask,x
+  plp
+  rts
+
+/**
+* @param x<int,8bit> input device id
+*/
+core.input.get.press:
+  php
+  rep #$31
+  jsr _getInputDevicePointer
+  lda.w inputDevice.press,x
+  and.w inputDevice.mask,x
+  plp
+  rts
+
+/**
+* @param x<int,8bit> input device id
+*/
+core.input.get.trigger:
+  php
+  rep #$31
+  jsr _getInputDevicePointer
+  lda.w inputDevice.trigger,x
+  and.w inputDevice.mask,x
+  plp
+  rts
+
+/**
+* @param x<int,8bit> input device id
+* @return x<int,16bit> input device pointer
+*/
+_getInputDevicePointer:
+  php
+  rep #$31
+  pha
+  txa
+  and.w #$ff
+  cmp #INPUT.DEVICE.ID.MAX
+  bcc +
+	pha
+	TRIGGER_ERROR E_BadInputDevice
+
++
+  asl a
+  asl a
+  asl a
+  tax
+  pla
+  plp
+  rts
+
+/**
+* @param x<int,8bit> input device id
+*/
+core.input.reset:
+  php
+  rep #$31
+  jsr core.input.resetMask
+  stz.w inputDevice.trigger,x
+  stz.w inputDevice.old,x
+  stz.w inputDevice.press,x
+  plp
+  rts
+
+/**
+* @param x<int,8bit> input device id
+*/
+core.input.resetMask:
+  php
+  rep #$31
+  lda #$ffff
+  jsr core.input.setMask
+  plp
+  rts
+
+core.input.refresh:
+	php
+	rep #$31
+	lda.w CheckJoypadMode
+	and #%11
+	asl a
+	tax
+	sep #$20
+	jsr (CheckJoypadModeLUT,x)
+	plp
+	rts
+
+
+CheckJoypadModeLUT:
+	.dw	CheckJoypadSinglePlayer
+	.dw CheckJoypadVoid
+	.dw CheckJoypadVoid
+	.dw CheckJoypadVoid
+	
+CheckJoypadVoid:
+	rts
+
+;fast joy1 checker. check this late in nmi so we don't have to wait for auto joypad read to finish:
+CheckJoypadSinglePlayer:
+	  lda.l HVBJOY
+	  bit #HVBJOY_AUTO_JOY_STATUS
+	  bne CheckJoypadSinglePlayer
+
+	ldx #INPUT.DEVICE.ID.0
+	jsr _checkInputDevice
+	rts
+
+_checkInputDevice:
+	rep #$30
+	jsr _getInputDevicePointer
+	lda.w inputDevice.old,x	;get last button state
+	eor #$ffff			;xor
+	sta.w inputDevice.trigger,x
+	lda.l JOY1L
+	sta.w inputDevice.press,x
+	sta.w inputDevice.old,x
+	and.w inputDevice.trigger,x	;and and only get buttons that werent pressed last frame
+	sta.w inputDevice.trigger,x	;store in joypad buffer
+	rts
+.ends
+

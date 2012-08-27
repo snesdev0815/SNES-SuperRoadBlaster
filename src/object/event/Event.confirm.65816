@@ -1,0 +1,49 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/event/Event.confirm.h"
+.section "Event.confirm"
+
+  METHOD init
+  rep #$31
+
+  lda OBJECT.CALL.ARG.1,s
+  sta.b event.startFrame
+  lda OBJECT.CALL.ARG.2,s
+  sta.b event.endFrame
+  lda OBJECT.CALL.ARG.3,s
+  sta.b event.result
+  lda OBJECT.CALL.ARG.4,s
+  sta.b event.resultTarget
+
+  NEW Brightness.CLS.PTR this.objBrightness
+  rts
+
+  METHOD play
+  rep #$31
+/*
+  ;CALL Msu1.getCurrentFrame.MTD event.msu1Handler
+  ;cmp.b event.endFrame
+  lda.b event.endFrame
+  jsr GLOBAL.checkFrameReached
+  bcc +
+	CALL Event.confirm.kill.MTD iterator.self
++
+*/
+  ;load new chapter script if start/a has been pressed
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #(JOY_BUTTON_A | JOY_BUTTON_START)
+  beq +
+	lda #BRIGHTNESS.NONE
+	CALL Brightness.fadeTo.MTD this.objBrightness
+
+	pei (event.resultTarget)
+	NEW Script.CLS.PTR oopCreateNoPtr
+	pla
++ rts
+
+  CLASS Event.confirm
+.ends	
+	

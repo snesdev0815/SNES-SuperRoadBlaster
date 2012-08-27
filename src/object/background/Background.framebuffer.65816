@@ -1,0 +1,296 @@
+/**
+* background object representing access to one background layer
+* 
+* -backgrounds
+*   -one class for all backgrounds
+*   -backgrounds are "virtual", i.e. not hard-tied to physically present backgrounds in current screen mode(because screen mode might be switched around, even mid-frame)
+*	-nevertheless, the screen number represents the hardware bg id of this background
+*	-this means there may be multiple background objects for a single hardware bg layer present at the same time.
+*   -input: bpp, bg number, tilemap size, colors to use
+*   -methods:
+*		-constructor(bpp(1-4, 2bit), bg number(0-3,2bit), tilemap size($800/$1000/$2000, 2bit), tiles to allocate(0-$ffff, 2 byte), cgram to allocate(0-$1ff, 2 byte))
+*	 	-getAllocatedMemory(tiles,tilemap,palette)
+ nice opportunity to implement default object methods & properties:
+  -properties should be struct to be prepended to each objects
+  -methods should be collected in abstract default class
+  -default methods will probably have to be included in extra file and appended to each class with ifdefs, so that they can be redefined by each class.
+  -dimension
+  -methods:
+	-each (iterate)
+	  -must somehow implemented while loop
+	-resetIterator
+	-setPosition(x/y/z?, value)
+	-getPosition(x/y/z?)
+	;virtual dimensions, not physical size:
+	-setSize(x/y/z?, value)	;usually not valid for bgs?
+	-getSize(x/y/z?)
+	-translate(x/y/z?, value) ;move
+	
+  -properties
+	-self ds 4	;hash pointer to self
+	-position.x ds 3	;2 bytes coarse, 1 byte subpixel accuracy
+	-position.y ds 3	;2 bytes coarse, 1 byte subpixel accuracy
+	-position.z ds 3	;2 bytes coarse, 1 byte subpixel accuracy
+	-iterator dw/db?
+	-iterator.currentObject ds 4	;hash pointer to current object in iterator loop.
+
+  -object iterator properties(16 max?)
+	-isBg
+	-isCollidable
+	-isSingleton
+*/
+.include "src/object/background/Background.framebuffer.h"
+.section "Background.framebuffer"
+
+_initBadArgs:
+  TRIGGER_ERROR E_BadParameters
+
+
+/**
+* init background, make sure input args are somewhat sane, allocate required memory.
+*
+* @param arg.1 int 	bpp(0-3, 2bit)
+* @param arg.2 int	bg number(0-3,2bit)
+* @param arg.3 int	tilemap mirror flags, see BGSC_X_MIRROR, BGSC_Y_MIRROR (2bit)
+* @param arg.4 int	tiles to allocate(0-$ffff, 2 byte)
+* @param arg.5 int	cgram to allocate(0-$1ff, 2 byte)
+*/
+  METHOD init
+  .accu 16
+  lda OBJECT.CALL.ARG.1,s
+  cmp #PALETTE.BPP.8 + 1
+  bcs _initBadArgs
+
+  sta.b this.bpp
+
+  lda OBJECT.CALL.ARG.2,s
+  cmp #BG.LAYER.3 + 1
+  bcs _initBadArgs
+
+  sta.b this.bgNumber
+
+  lda OBJECT.CALL.ARG.3,s
+  cmp #(BGSC_X_MIRROR | BGSC_Y_MIRROR) + 1
+  bcs _initBadArgs
+
+  sta.b this.tilemap.mirrorFlags
+  asl a
+  tax
+  lda.l TILEMAP.LENGTH.LUT,x
+  sta.b this.tilemap.length
+  
+  lda OBJECT.CALL.ARG.4,s
+  sta.b this.tiles.length
+
+  lda OBJECT.CALL.ARG.5,s
+  cmp #PALETTE.COLOR.COUNT * PALETTE.COLOR.SIZE + 1
+  bcs _initBadArgs
+
+  sta.b this.palette.length
+
+  lda.w #TILEMAP.GRANULARITY
+  ldy.w #0	;start
+  ldx.b this.tilemap.length
+
+  ;skip allocation if requested length is zero
+  bne ++
+	txa
+	bra +
+++
+
+  jsr core.vram.allocate
+  bcs +
+	pei (this.tilemap.length)
+    TRIGGER_ERROR E_OutOfVram
+
++ stx.b this.tilemap.start
+  sep #$20
+  sta.b this.tilemap.id
+  rep #$31
+
+  lda.w #TILES.GRANULARITY
+  ldy.w #0	;start
+  ldx.b this.tiles.length
+  ;skip allocation if requested length is zero
+  bne ++
+	txa
+	bra +
+++
+
+  jsr core.vram.allocate
+  bcs +
+	pei (this.tiles.length)
+    TRIGGER_ERROR E_OutOfVram
+
++ stx.b this.tiles.start
+  sep #$20
+  sta.b this.tiles.id
+  rep #$31
+
+  lda.b this.bpp
+  and.w #$ff
+  asl a
+  tax
+  lda.l PALETTE.GRANULARITY.LUT,x
+  ldy.w #PALETTE.START.BG
+  ldx.b this.palette.length
+  ;skip allocation if requested length is zero
+  bne ++
+	txa
+	bra +
+++
+
+  jsr core.cgram.allocate
+  bcs +
+	pei (this.palette.length)
+    TRIGGER_ERROR E_OutOfCgram
+
++ stx.b this.palette.start
+  sep #$20
+  sta.b this.palette.id
+  rep #$31
+
+  rts
+
+/**
+* deallocate all allocated vram/cgram space
+*/
+  METHOD kill
+  sep #$20
+  lda.b this.tiles.id
+  beq +
+	jsr core.vram.deallocate
+
++ lda.b this.tilemap.id
+  beq +
+	jsr core.vram.deallocate
+
++ lda.b this.palette.id
+  beq +
+	jsr core.cgram.deallocate
+
++ lda #OBJR_kill
+  sta 3,s
+  rts
+/*
+  METHOD setPosition
+  rts
+
+  METHOD getPosition
+  rts
+
+  METHOD getSize
+  rts
+
+  METHOD translate
+  rts
+*/
+/**
+* return amount & location of allocated memory
+* 
+* @param a int	type of allocated memory to return
+*
+* @return c bool	true if memory was allocated
+* @return x int	start adress of allocated memory
+* @return y int	length of allocated memory
+*/
+  METHOD getAllocatedMemory
+  .accu 16
+  cmp.w #MALLOC.MAXTYPES
+  bcc +
+    TRIGGER_ERROR E_BadParameters
+
++ asl a
+  tax
+  jsr (_getAllocatedMemory.LUT,x)
+  rts
+
+_getAllocatedMemory.LUT:
+  .dw _getAllocatedMemoryTiles
+  .dw _getAllocatedMemoryTilemap
+  .dw _getAllocatedMemoryPalette
+
+_getAllocatedMemoryTiles:
+  ldx.b this.tiles.start
+  ldy.b this.tiles.length
+  lda.b this.tiles.id
+  and.w #$ff
+  bra _getAllocatedMemoryReturnCarry
+
+_getAllocatedMemoryTilemap:
+  ldx.b this.tilemap.start
+  ldy.b this.tilemap.length
+  lda.b this.tilemap.id
+  and.w #$ff
+  bra _getAllocatedMemoryReturnCarry
+
+_getAllocatedMemoryPalette:
+  ldx.b this.palette.start
+  ldy.b this.palette.length
+  lda.b this.palette.id
+  and.w #$ff
+
+;return carry clear if no memory allocated
+_getAllocatedMemoryReturnCarry:
+  clc
+  beq +
+	sec
+
++ rts
+
+/**
+* write background settings to ppu register buffers.
+* background still has to be enabled in mainscreen-register in order to be displayed on screen
+*/
+  METHOD makePhysical
+  .accu 16
+  pea 0
+
+  ;calculate tile adress setting for corresponding register
+  lda.b this.bgNumber
+  and.w #$ff
+  asl a
+  tax
+  lda.w BGTilesVram12
+  and.l TILES.MASK.LUT,x
+  sta.b 1,s
+  lda.l TILES.SHIFT.LUT,x
+  tay
+
+  lda.b this.tiles.start
+  xba
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  and.w #$f
+  
+- cpy.w #0
+  beq +
+	asl a
+	dey
+	bra -
+
++ ora.b 1,s
+  sta.w BGTilesVram12
+
+  ;calculate tilemap adress setting for corresponding register
+  lda.b this.bgNumber
+  and.w #$ff
+  tax
+
+  lda.b this.tilemap.start
+  xba
+  lsr a
+  and.w #$fc
+  ora.b this.tilemap.mirrorFlags
+  sep #$20
+  sta.w BG1TilemapVram,x
+  
+  plx
+  rts
+
+  CLASS Background.framebuffer getAllocatedMemory makePhysical
+.ends	
+	

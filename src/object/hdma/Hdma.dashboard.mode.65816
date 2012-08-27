@@ -1,0 +1,316 @@
+/**
+* hdma object that switches msu1 video playback to direct-color dashboard mid-screen
+*
+somehow, one of the five allocated hdma channels ends up being doubled after using single wram buffer, but only after second scene (???)
+no idea 
+*/
+.include "src/object/hdma/Hdma.dashboard.mode.h"
+.section "Hdma.dashboard.mode"
+
+/**
+ * 
+ * @param a<int, 16bit> target y-position of dashboard switch
+ */
+  METHOD init
+  rep #$31
+  and.w #$ff
+  sta this.position
+  sep #$20
+
+  ;global regs update
+  lda.l colorAdditionSelect
+  sta this.buffer.cgwsel
+  ora #CGWSEL_DIRECT_COLOR_MODE
+  sta.l colorAdditionSelect
+
+  lda #HDMA.DASHBOARD.MODE.CHANNEL.LENGTH * HDMA.DASHBOARD.MODE.CHANNEL.COUNT 
+  sta hdma.ramBuffer.length
+  jsr abstract.Hdma.allocateBuffer
+
+  ldx hdma.ramBuffer.start
+  stx this.ramBuffer.start
+  ldx hdma.ramBuffer.length
+  stx this.ramBuffer.length
+  lda hdma.ramBuffer.id
+  sta this.ramBuffer.id
+
+  lda #DMAP_1_REG_WRITE_ONCE | DMAP_HDMA_INDIRECT_MODE
+  sta hdma.flags
+
+  lda #BGMODE & $ff
+  sta hdma.target
+
+  jsr core.nmi.stop
+  lda #hdma.mode
+  ldx #GLOBAL.BUFFER.screenMode
+  ldy #GLOBAL.dashboard.mode  
+  jsr _setupChannel
+  
+
+  lda #TMAIN & $ff
+  sta hdma.target
+
+  lda #hdma.mainScreen
+  ldx #GLOBAL.BUFFER.mainScreen
+  ldy #GLOBAL.dashboard.mainScreen  
+  jsr _setupChannel
+
+  lda #BG1SC & $ff
+  sta hdma.target
+
+  lda #hdma.tileMap
+  ldx #GLOBALS.BUFFER.bg1Tilemap
+  ldy #GLOBAL.dashboard.tileMap
+  jsr _setupChannel
+
+  lda #BG12NBA & $ff
+  sta hdma.target
+
+  lda #hdma.tiles
+  ldx #GLOBALS.BUFFER.bg12Tiles
+  ldy #GLOBAL.dashboard.tiles 
+  jsr _setupChannel
+
+  lda #DMAP_2_REG_WRITE_TWICE_EACH | DMAP_HDMA_INDIRECT_MODE
+  sta hdma.flags
+
+  lda #BG1HOFS & $ff
+  sta hdma.target
+
+  lda #hdma.position
+  ldx #GLOBALS.BUFFER.scroll.bg1.x
+  ldy #GLOBAL.dashboard.position.x
+  jsr _setupChannel
+  
+  jsr core.nmi.start
+  
+  rts
+
+/**
+ * 
+ * @param a<int, 16bit> target y-position of dashboard switch
+ */  
+  METHOD setYPosition
+;  rts
+  rep #$31
+  and.w #$ff
+  sta this.position
+  sep #$20
+  
+  lda #hdma.mode
+  ldx #GLOBAL.BUFFER.screenMode
+  ldy #GLOBAL.dashboard.mode  
+  jsr _updateChannel
+
+
+  lda #hdma.mainScreen
+  ldx #GLOBAL.BUFFER.mainScreen
+  ldy #GLOBAL.dashboard.mainScreen  
+  jsr _updateChannel
+
+
+  lda #hdma.tileMap
+  ldx #GLOBALS.BUFFER.bg1Tilemap
+  ldy #GLOBAL.dashboard.tileMap 
+  jsr _updateChannel
+
+  lda #hdma.tiles
+  ldx #GLOBALS.BUFFER.bg12Tiles
+  ldy #GLOBAL.dashboard.tiles 
+  jsr _updateChannel
+
+  lda #hdma.position
+  ldx #GLOBALS.BUFFER.scroll.bg1.x
+  ldy #GLOBAL.dashboard.position.x
+  jsr _updateChannel
+
+  rts
+  
+  METHOD play
+  rts
+
+  METHOD kill
+  rep #$31
+
+  jsr core.nmi.stop
+  
+  lda #hdma.mode
+  jsr abstract.Hdma.copyToMain
+  jsr abstract.Hdma.stop
+
+  lda #hdma.mainScreen
+  jsr abstract.Hdma.copyToMain
+  jsr abstract.Hdma.stop
+
+  lda #hdma.tileMap
+  jsr abstract.Hdma.copyToMain
+  jsr abstract.Hdma.stop
+
+  lda #hdma.tiles
+  jsr abstract.Hdma.copyToMain
+  jsr abstract.Hdma.stop
+
+  lda #hdma.position
+  jsr abstract.Hdma.copyToMain
+  jsr abstract.Hdma.stop
+
+  lda this.ramBuffer.id
+  sta hdma.ramBuffer.id  
+  
+  jsr core.nmi.start
+
+  ;extremely evil hack to make sure all hdma buffers have stopped before continuing
+  jsr core.nmi.waitFrame
+  
+  /*
+  jsr core.nmi.waitFrame
+  jsr core.nmi.waitFrame
+  jsr core.nmi.waitFrame
+  jsr core.nmi.waitFrame
+  jsr core.nmi.waitFrame
+  */
+  jsr abstract.Hdma.deallocateBuffer
+  lda #OBJR_kill
+  sta 3,s   
+  rts
+
+/**
+ * @param a<int 16 bit> lower byte: current channel
+ * @param x<int 16 bit> normal reg pointer in bank 7e
+ * @param y<int 16 bit> dashboard reg pointer in bank 7e
+ */  
+_updateChannel:
+  php
+  sep #$20
+  sta this.current.channel
+  stz this.current.channel+1
+  
+  rep #$31
+  txa
+  sta this.current.register.pre
+  tya
+  sta this.current.register.post
+
+  lda this.current.channel
+  jsr abstract.Hdma.copyToMain
+
+  jsr _buildHdmaList
+
+  plp
+  rts
+
+
+/**
+ * @param a<int 16 bit> lower byte: current channel
+ * @param x<int 16 bit> normal reg pointer in bank 7e
+ * @param y<int 16 bit> dashboard reg pointer in bank 7e
+ */  
+_setupChannel:
+  php
+  sep #$20
+  stz hdma.channel
+  sta this.current.channel
+  stz this.current.channel+1
+
+  lda #RAM
+  sta hdma.indirect.bank
+  
+  rep #$31
+  txa
+  sta this.current.register.pre
+  tya
+  sta this.current.register.post
+/*  
+  lda #$10
+  sta hdma.ramBuffer.length
+  jsr abstract.Hdma.allocateBuffer
+*/
+
+  lda this.current.channel
+  sec
+  sbc #hdma.mode
+  clc
+  adc this.ramBuffer.start
+  sta hdma.ramBuffer.start
+
+  lda #HDMA.DASHBOARD.MODE.CHANNEL.LENGTH
+  sta hdma.ramBuffer.length
+
+  ;lda this.ramBuffer.id
+  ;sta hdma.ramBuffer.id  
+  
+
+  jsr _buildHdmaList
+  
+
+  lda hdma.ramBuffer.start
+  clc
+  adc #GLOBAL.wramBuffer.start
+  tax
+  lda #RAM
+  jsr abstract.Hdma.setTableAdress
+  jsr abstract.Hdma.start
+  
+  lda this.current.channel
+  jsr abstract.Hdma.updateFromMain  
+  
+  plp
+  rts
+
+_buildHdmaList:
+  php
+  rep #$31
+
+  ldx hdma.ramBuffer.start
+
+  sta.w GLOBAL.wramBuffer.start,x  
+  lda this.position
+  beq ++
+
+  cmp #$80
+  bcc +
+-  
+    pha
+    lda #$7f
+    sta.w GLOBAL.wramBuffer.start,x
+    inx
+    lda this.current.register.pre
+    sta.w GLOBAL.wramBuffer.start,x
+    inx
+    inx
+    pla
+    sec
+    sbc #$7f
+    cmp #$80
+    bcs -
+    
+    
++  
+  sta.w GLOBAL.wramBuffer.start,x
+  inx
+  
+  lda this.current.register.pre
+  sta.w GLOBAL.wramBuffer.start,x
+  inx
+  inx
+
+++  
+  lda #1
+  sta.w GLOBAL.wramBuffer.start,x
+  inx  
+  lda this.current.register.post
+  sta.w GLOBAL.wramBuffer.start,x
+  inx
+  inx
+  stz.w GLOBAL.wramBuffer.start,x
+  inx
+  inx
+  stz.w GLOBAL.wramBuffer.start,x
+  
+  plp
+  rts
+
+
+  CLASS Hdma.dashboard.mode setYPosition
+.ends	
+	

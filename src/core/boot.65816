@@ -1,0 +1,144 @@
+	.include "src/core/boot.h"
+
+
+.Section "Main Code"
+core.boot.init:
+	sep #$20
+/*
+;debug, prime WRAM to find uninitialized variable reads
+    ldx #0
+-     lda #$ff
+      sta $7e0000,x
+      inx
+      bne -
+*/    
+
+	lda #RAM
+	pha
+	plb
+	rep #$31
+	lda.w #ZP
+	tcd
+
+	lda.w #STACK
+	tcs
+
+	jsr ClearRegisters
+
+	sep #$20
+
+
+	lda.b #0		;clear zero page
+	ldy.w #kernelEnd-kernelStart
+	ldx.w #ZP
+	jsr ClearWRAM
+
+	lda.b #0		;clear variable buffer
+	ldy.w #VARS_end-VARS
+	ldx.w #VARS
+	jsr ClearWRAM
+
+	jsr core.wram.init
+	jsr core.vram.init
+	jsr core.cgram.init
+	jsr core.random.init
+	jsr core.dma_channel.init
+	jsr core.input.init
+    jsr core.nmi.init
+    jsr core.irq.init
+	jsr core.dma.init
+	jsr core.oam.init
+	jsr core.screen.init
+	jsr core.object.init
+    jsr core.persistency.init
+
+	rep #$31
+	NEW Script.CLS.PTR oopCreateNoPtr main
+
+;tier 0 main loop starts here:
+core.boot.mainLoop:
+    jsr core.nmi.waitFrame
+	jsr core.oam.play
+	jsr core.object.play
+
+	bra core.boot.mainLoop
+.ends
+
+.bank 0 slot 0
+.org BANK0_LOROM
+.section "IRQ Bootstrap" force
+
+NmiHandler:
+	jml core.nmi.play
+
+EmptyHandler:
+	rti
+
+Stop:
+	jml StopJmp
+StopJmp:
+	rep #$31
+    TRIGGER_ERROR E_Brk
+
+StopCop:
+	jml StopCopJmp
+
+StopCopJmp:
+	rep #$31
+    TRIGGER_ERROR E_Cop
+
+
+Boot:
+	sei
+	clc
+	xce
+	phk
+	plb
+	sep #$20
+	stz NMITIMEN		;disable timers, NMI,and auto-joyread
+	lda #MEMSEL_FASTROM_ENABLE
+	sta MEMSEL		;set memory mode to fastrom
+	sta.l GLOBAL.memsel
+	jml core.boot.init
+
+IrqHookUp:
+	jml core.irq.play
+
+.ends
+
+;wla dx is too fucking stupid to properly allocate the memory it later needs for its own header creation feature, so we have to create it manually:
+.org $ffc0
+.section "header hack" force
+  .db "SUPER ROAD BLASTER   "
+  .db $31	;mapping
+  .db $2	;cartridgetype
+  .db 8	;romsize
+  .db 1	;sramsize
+  .db 2	;country
+  .db $33	;licenseecode
+  .db 2	;version
+  .dw $F9D8
+  .dw $0627
+.ends
+
+
+.bank 0 slot 0
+.org $ffe4
+.section "native vector hack" force
+	.dw StopCop
+	.dw Stop
+	.dw EmptyHandler
+	.dw NmiHandler
+	.dw EmptyHandler
+	.dw IrqHookUp
+.ends
+
+.org $fff4
+.section "emu vector hack" force
+	.dw StopCop
+	.dw EmptyHandler
+	.dw EmptyHandler
+	.dw EmptyHandler
+	.dw Boot
+	.dw EmptyHandler
+.ends

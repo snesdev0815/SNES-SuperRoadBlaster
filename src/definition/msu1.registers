@@ -1,0 +1,22 @@
+;MSU1 register definitions
+
+.define MSU_STATUS	$2000
+	.define MSU_STATUS_DATA_BUSY		1 << 7	;default true
+	.define MSU_STATUS_AUDIO_BUSY		1 << 6	;default true
+	.define MSU_STATUS_AUDIO_REPEAT		1 << 5	;default false
+	.define MSU_STATUS_AUDIO_PLAY		1 << 4	;default false
+    .define MSU_STATUS_AUDIO_ERROR      1 << 3  ;recent addition to msu1-spec, @see board.byuu.org/viewtopic.php?f=16&t=2289&p=68179
+	.define MSU_STATUS_VERSION			2 << 0
+
+.define MSU_DATA	$2001	;data stream port
+.define MSU_ID		$2002	;2002-2007 must return "S-MSU1"
+
+.define MSU_ADRESS	$2000	;32bit adress for data stream port
+.define MSU_TRACK	$2004	;word
+.define MSU_VOLUME	$2006
+  .define MSU_VOLUME_FULL			$ff	;default value
+  .define MSU_VOLUME_MUTE			0
+
+.define MSU_CONTROL	$2007
+	.define MSU_CONTROL_REPEAT		1 << 1	;repeat/stop after one run
+	.define MSU_CONTROL_PLAY		1 << 0	;play/pause

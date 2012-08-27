@@ -1,0 +1,36 @@
+/**
+* Checkpoint object.
+*
+* Stays active for as long as there are no other checkpoints.
+* Just contains current script init adress for now.
+* 
+*/
+.include "src/object/event/Event.checkpoint.h"
+.section "Event.checkpoint"
+
+  METHOD init
+  rep #$31
+  jsr abstract.Iterator.killOthers
+  ;Mwahaha, I'm the only valid checkpoint now!!!
+
+  ;seek current chapter, get init adress
+  jsr abstract.Iterator.reset
+  lda.w #(OBJECT.PROPERTIES.isScript | OBJECT.PROPERTIES.isChapter)
+  jsr abstract.Iterator.each.byProperties
+  bcs +
+	;error, no chapter found!
+    TRIGGER_ERROR E_NoChapterFound
+
+
++ CALL Script.getScriptAdress.MTD iterator.target
+  sta.b this.checkPointAdress
+  rts
+
+  METHOD getCheckpointAdress
+  rep #$31
+  lda.b this.checkPointAdress
+  rts
+
+  CLASS Event.checkpoint getCheckpointAdress
+.ends	
+	

@@ -1,0 +1,90 @@
+/**
+* left arrow sprite
+* 
+* @param a<int, 16bit>  x-pos
+* @param 1<int, 16bit>  y-pos
+*/
+.include "src/object/sprite/left_arrow.h"
+.section "left_arrow"
+
+  METHOD init
+  sep #$20
+;  inc.b animation.isColorMath
+  
+  rep #$31
+
+  sta this.endFrame
+
+  lda OBJECT.CALL.ARG.1,s
+  sta.b dimension.position.x + 1
+
+  lda OBJECT.CALL.ARG.2,s
+  sta.b dimension.position.y + 1
+
+  jsr abstract.Iterator.reset
+
+  lda.w #OBJID.Right_arrow
+  jsr abstract.Iterator.each.byId
+  bcc +
+    CALL Right_arrow.getAllocatedPalette.MTD iterator.target
+    sep #$20
+    stx.b animation.palette.start
+    sta.b animation.palette.id
+    tya
+    sta.b animation.palette.startid
+    rep #$31
++
+
+  lda #SPRITE.left_arrow.PTR
+  jsr abstract.Sprite.startAnimation
+
+  sep #$20
+  lda.b #$1
+  sta.b animation.isLooping
+  lda.b #$1
+  sta.b animation.speed
+  rts
+  
+  METHOD play
+  jsr abstract.Sprite.playAnimation
+  rep #$31
+  lda.b this.endFrame
+  jsr GLOBAL.checkFrameReached
+  bcc +
+    lda #224
+    sta.b dimension.position.y + 1  
+    ;CALL Right_arrow.kill.MTD iterator.self
+
++ rts
+
+  METHOD reset
+  rep #$31
+  sta this.endFrame
+
+  lda OBJECT.CALL.ARG.1,s
+  sta.b dimension.position.x + 1
+
+  lda OBJECT.CALL.ARG.2,s
+  sta.b dimension.position.y + 1
+  rts
+
+  METHOD getAllocatedPalette
+  rep #$31  
+  ldx.b animation.palette.start
+  lda.b animation.palette.startid
+  and.w #$ff
+  tay
+  lda.b animation.palette.id
+  and.w #$ff
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr abstract.Sprite.deallocate
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+  CLASS Left_arrow reset getAllocatedPalette
+.ends	
+	

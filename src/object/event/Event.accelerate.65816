@@ -1,0 +1,87 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/event/Event.accelerate.h"
+.section "Event.accelerate"
+
+  METHOD init
+  rep #$31
+
+  lda OBJECT.CALL.ARG.1,s
+  sta.b event.startFrame
+  lda OBJECT.CALL.ARG.2,s
+  sta.b event.endFrame
+  lda OBJECT.CALL.ARG.3,s
+  sta.b event.result
+  lda OBJECT.CALL.ARG.4,s
+  sta.b event.resultTarget
+
+  lda event.endFrame
+  NEW Turbo_icon.CLS.PTR this.sprite 112 80
+  lda event.endFrame
+  CALL Turbo_icon.reset.MTD this.sprite 112 80
+  
+  ;NEW Player.CLS.PTR event.player
+  NEW Spc.CLS.PTR this.audio
+  lda.w #SAMPLE.0.TURBO
+  CALL Spc.SpcPlaySoundEffect.MTD this.audio
+
+  rts
+
+  METHOD play
+  rep #$31
+  
+  inc this.age
+  
+  ;trigger death if player hit wrong button
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #JOY_BUTTON_B
+  beq +
+    jsr abstract.Event.triggerResult
+	rts
+
+
++
+
+  ;kill self if player pressed appropriate button
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.press
+  and.w #JOY_BUTTON_A
+  beq +
+  
+      /*lda.w #SAMPLE.0.OK
+      CALL Spc.SpcPlaySoundEffect.MTD this.audio*/
+
+      jsr core.input.get.trigger
+      and.w #JOY_BUTTON_A
+      beq ++
+        lda this.age
+        cmp #EVENT.BONUS.EXTRA.TIMEOUT
+        bcs ++
+          lda #PLAYER.BONUS.EXTRA
+          bra +++
+++      
+	  lda #PLAYER.BONUS.DEFAULT
++++
+	  NEW Sprite.score.CLS.PTR oopCreateNoPtr 112 80
+	  ;CALL Player.addToScore.MTD event.player
+	  CALL Event.confirm.kill.MTD iterator.self
+	  rts
+
++
+
+  jsr abstract.Event.checkResult
+  rts
+
+  METHOD kill
+  rep #$31
+  ;CALL Turbo_icon.kill.MTD this.sprite
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+  CLASS Event.accelerate
+.ends	
+	

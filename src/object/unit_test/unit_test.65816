@@ -1,0 +1,364 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/unit_test/unit_test.h"
+.section "unit_test"
+
+  METHOD init
+  rep #$31
+  /*jsr _allocateVram
+  bcs +
+	pea 1
+    TRIGGER_ERROR E_UnitTestFail
+
++ */
+/*  jsr _allocateCgram
+  bcs +
+	pea 2
+    TRIGGER_ERROR E_UnitTestFail
+
++ */jsr _testObject
+  bcs +
+	pea 3
+    TRIGGER_ERROR E_UnitTestFail
+
++ jsr _testSelf
+  bcs +
+	pea 4
+    TRIGGER_ERROR E_UnitTestFail
+
++ jsr _testIterator
+  bcs +
+	pea 5
+    TRIGGER_ERROR E_UnitTestFail
+
++ jsr _testScreen
+  bcs +
+	pea 6
+    TRIGGER_ERROR E_UnitTestFail
+
++
+  ;must throw error
+  ;NEW abstract.Event.CLS.PTR oopCreateNoPtr
+;  TRIGGER_ERROR E_UnitTestComplete
+  rts
+
+/**
+* set this.selfTest
+*/
+  METHOD setSelf
+  rep #$31
+  sta.b this.selfTest
+  rts
+
+/**
+* test if iterator.self actually points to itself and if methods can be invoked on it
+*/
+_testSelf:
+  rep #$31
+  lda.b iterator.self
+  lda.b iterator.self+2
+  lda.w #$5555
+  sta.b this.selfTest
+  lda.w #$aaaa
+  CALL Unit_test.setSelf.MTD iterator.self
+
+  lda.b this.selfTest
+  cmp.w #$aaaa
+  bne +
+
+	sec
+	rts
+
++ clc
+  rts
+
+/**
+* test if iterator actually finds something
+*/
+_testIterator:
+  rep #$31
+  NEW Iterator_test.CLS.PTR hashPtr.2
+  NEW Iterator_test.CLS.PTR hashPtr.3
+
+  ;make sure deleted objects are not found
+  NEW Iterator_test.CLS.PTR hashPtr.4
+  CALL Iterator_test.kill.MTD hashPtr.4
+
+
+;test if newly-created objects are found and if methods can be invoked on them
+  jsr abstract.Iterator.reset
+-	lda.w #(OBJECT.PROPERTIES.isUnitTest | OBJECT.PROPERTIES.isLifeform)
+	jsr abstract.Iterator.each.byProperties
+	bcc +
+	CALL Iterator_test.badeaffe.MTD iterator.target
+	bra -
+
++ lda.b iterator.count
+  cmp.w #2
+  bne _testIteratorFail
+
+;test if self is found aswell
+  jsr abstract.Iterator.reset
+-	lda.w #OBJECT.PROPERTIES.isUnitTest
+	jsr abstract.Iterator.each.byProperties
+	bcs -
+
+  lda.b iterator.count
+  cmp.w #3
+  bne _testIteratorFail
+
+;test if self-exclude of iterator.others works
+  jsr abstract.Iterator.reset
+-	lda.w #OBJECT.PROPERTIES.isUnitTest
+	jsr abstract.Iterator.others
+	bcs -
+
+  lda.b iterator.count
+  cmp.w #2
+  bne _testIteratorFail
+
+;test dynamic property setting
+  jsr abstract.Iterator.reset
+  lda.w #OBJECT.PROPERTIES.isLifeform
+  jsr abstract.Iterator.each.byProperties
+  bcc +
+	lda.w #OBJECT.PROPERTIES.likesBananas
+	CALL Iterator_test.setProperties.MTD iterator.target
+
++ jsr abstract.Iterator.reset
+-	lda.w #(OBJECT.PROPERTIES.isLifeform | OBJECT.PROPERTIES.likesBananas)
+	jsr abstract.Iterator.each.byProperties
+	bcs -
+  lda.b iterator.count
+  cmp.w #1
+  bne _testIteratorFail
+
+  sec
+  rts
+
+_testIteratorFail:
+  clc
+  rts
+
+
+_testObject:
+  rep #$31
+  pea 6
+  pea 5
+
+  lda.w #789
+  NEW Test_object.CLS.PTR hashPtr.1 $aaaa $5555 1 2 3 4
+
+  pla
+  pla
+
+  lda.w #7
+  CALL Test_object.testParameterReturn.MTD hashPtr.1 $aaaa $5555 1 2 3 4
+
+  bcc _testObjectFail
+
+  cpy.w #$5678
+  bne _testObjectFail
+
+  cpx.w #$9abc
+  bne _testObjectFail
+
+  pea 1234
+  CALL Test_object.testParameterReturn.MTD hashPtr.1
+  pla
+
+  bcs _testObjectFail
+
+  CALL Test_object.kill.MTD hashPtr.1
+  sec
+  rts
+
+_testObjectFail:
+  clc
+  rts
+
+_testObjectCarryClear:
+  clc
+  rts
+
+_allocateVram:
+  php
+  rep #$31
+  lda #$800	;stepsize
+  ldx #$800	;blocksize
+  ldy.w #0	;start
+  jsr core.vram.allocate
+  bcc _allocateVramFail		;allocation must succeed
+
+  cmp.w #2	;must return id
+  bne _allocateVramFail
+
+  cpx.w #$800	;must have allocated vram adress
+  bne _allocateVramFail
+
+  lda #$2000	;stepsize
+  ldx #$4000	;blocksize
+  ldy.w #0	;start
+  jsr core.vram.allocate
+  bcc _allocateVramFail		;allocation must succeed
+
+  cmp.w #3	;must return id
+  bne _allocateVramFail
+
+  cpx.w #$2000	;must have allocated vram adress
+  bne _allocateVramFail
+
+  lda #$800	;stepsize
+  ldx #$800	;blocksize
+  ldy.w #0	;start
+  jsr core.vram.allocate
+  bcc _allocateVramFail		;allocation must succeed
+
+  cmp.w #4	;must return id
+  bne _allocateVramFail
+
+  cpx.w #$1000	;must have allocated vram adress
+  bne _allocateVramFail
+
+  lda #$4000	;stepsize
+  ldx #$8000	;blocksize
+  ldy.w #0	;start
+  jsr core.vram.allocate
+  bcs _allocateVramFail		;allocation must fail, not enough vram left
+
+  ;no return value, but throws error on failure
+  lda.w #2
+  jsr core.vram.deallocate
+  lda.w #3
+  jsr core.vram.deallocate
+  lda.w #4
+  jsr core.vram.deallocate
+
+  plp
+  sec
+  rts
+
+_allocateVramFail:
+  plp
+  clc
+  rts
+
+;@todo: include y, start adress parameter
+_allocateCgram:
+  php
+  rep #$31
+  lda #$8	;stepsize
+  ldx #$10	;blocksize
+  ldy #$0	;start adress
+  jsr core.cgram.allocate
+  bcc _allocateCgramFail		;allocation must succeed
+
+  cmp.w #1	;must return id
+  bne _allocateCgramFail
+
+  cpx.w #0	;must have allocated vram adress
+  bne _allocateCgramFail
+
+  lda #$20	;stepsize
+  ldx #$40	;blocksize
+  ldy #$0	;start adress
+  jsr core.cgram.allocate
+  bcc _allocateCgramFail		;allocation must succeed
+
+  cmp.w #2	;must return id
+  bne _allocateCgramFail
+
+  cpx.w #$20	;must have allocated vram adress
+  bne _allocateCgramFail
+
+  lda #$8	;stepsize
+  ldx #$10	;blocksize
+  ldy #$20	;start adress
+  jsr core.cgram.allocate
+  bcs _allocateCgramFail		;allocation must fail, 8 palette limit exceeded
+
+/*  cmp.w #3	;must return id
+  bne unitTest_allocateCgramFail
+
+  cpx.w #$10	;must have allocated vram adress
+  bne unitTest_allocateCgramFail*/
+
+  lda #$20	;stepsize
+  ldx #$100	;blocksize
+  ldy #$180	;start adress
+  jsr core.cgram.allocate
+  bcs _allocateCgramFail		;allocation must fail, not enough vram left
+
+  ;no return value, but throws error on failure
+  lda.w #2
+  jsr core.cgram.deallocate
+
+  lda.w #1
+  jsr core.cgram.deallocate
+
+  ;verify maximum pal length (stepsize * blocksize) doesnt throw error
+  lda #$20	;stepsize
+  ldx #$100	;blocksize
+  ldy #$0	;start adress
+  jsr core.cgram.allocate
+  bcc _allocateCgramFail		;allocation must succeed
+
+  cmp.w #3	;must return id
+  bne _allocateCgramFail
+
+
+  lda.w #3
+  jsr core.cgram.deallocate
+
+  plp
+  sec
+  rts
+
+_allocateCgramFail:
+  plp
+  clc
+  rts
+
+;just a static screen test for now.
+;@todo: has to be adapted for variable screen position/size later on
+_testScreen:
+  php
+  rep #$31
+  ldx.w #0
+  ldy.w #0
+  jsr core.screen.convertAbsoluteToScreen
+  bcc _testScreenFail
+  cpx.w #0
+  bne _testScreenFail
+  cpy.w #0
+  bne _testScreenFail
+
+  ldx.w #$ff
+  ldy.w #$df
+  jsr core.screen.convertAbsoluteToScreen
+  bcc _testScreenFail
+  cpx.w #$ff
+  bne _testScreenFail
+  cpy.w #$df
+  bne _testScreenFail
+
+  ldx.w #$100
+  ldy.w #$e0
+  jsr core.screen.convertAbsoluteToScreen
+  bcs _testScreenFail
+
+  plp
+  sec
+  rts
+  
+
+_testScreenFail:
+  plp
+  clc
+  rts
+
+  CLASS Unit_test setSelf
+.ends	
+	

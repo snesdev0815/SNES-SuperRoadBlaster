@@ -1,0 +1,15 @@
+<chapter>
+	<timeline>
+		<timestart min="26" second="24" ms="500"/>	
+		<timeend min="26" second="27" ms="300"/>
+	</timeline>
+	<params>
+		<str key="controller" value="game"/>	
+		<int key="iscrash" value="3"/>
+        <int key="cockpit" value="0"/>		
+		<int key="dash_down" value="95"/>	
+	</params>
+	<result>
+		<lastcheckpoint/>
+	</result>
+</chapter>				

@@ -1,0 +1,260 @@
+.include "src/core/irq.h"
+
+.section "irq stuff"
+
+/*
+a little reconfigurable irq handler
+problem is that normal object model and irqs run asynchronously, so you can't just call object code without side-effects(the object might be executing code or being moved around currently)
+thats why objects can register a callback
+*/
+
+/**
+* change irq position
+*
+* @param x <int 16bit>   x-pos
+* @param y <int 16bit>   y-pos
+*/
+core.irq.position.set:
+  php
+  rep #$31
+
+  tya
+  sta.l VTIMEL
+  sta.l GLOBAL.irq.ypos
+  
+  txa
+  sta.l HTIMEL
+  sta.l GLOBAL.irq.xpos
+
+  plp
+  rts
+
+/**
+* get current irq position
+*
+* @return x <int 16bit>   x-pos
+* @return y <int 16bit>   y-pos
+*/
+core.irq.position.get:
+  php
+  rep #$31
+
+  lda.l GLOBAL.irq.ypos
+  tay
+
+  lda.l GLOBAL.irq.xpos
+  tax
+
+  plp
+  rts
+
+
+/**
+* starts requested irq beginning on next frame, which will trigger callback
+*
+* @param x <int 16bit>   adress of irq callback routine
+*/
+core.irq.registerCallback:
+  php
+  rep #$31
+  lda.l (ROM << 16),x
+  cmp #IRQ_MAGIC
+  beq +
+    TRIGGER_ERROR E_BadIrq
+
++
+  ;set irq position
+  inx
+  inx
+  lda.l (ROM << 16),x
+  sta.l VTIMEL
+  sta.l GLOBAL.irq.ypos
+  inx
+  inx
+  lda.l (ROM << 16),x
+  sta.l HTIMEL
+  sta.l GLOBAL.irq.xpos
+
+  ;register callback routine
+  inx
+  inx
+  txa
+  sta.l GLOBAL.irq.callback
+
+  ;enable irq next frame
+  sep #$20
+  lda.l GLOBAL.interruptFlags
+  ora #(NMITIMEN_Y_IRQ_ENABLE | NMITIMEN_X_IRQ_ENABLE)
+  sta.l GLOBAL.interruptFlags
+;  sta.l NMITIMEN
+  plp
+  rts
+
+/**
+* checks if input irq is registered
+*
+* @param x <int 16bit>   adress of irq callback routine
+* @return c <bool>  true if registered
+*/
+core.irq.isRegistered:
+  php
+  rep #$31
+  lda.l ((ROM << 16)+6),x
+  cmp.l GLOBAL.irq.callback
+  beq +
+    plp
+    clc
+    rts
+
++
+  plp
+  sec
+  rts
+
+/**
+* unregister and stop registered irq
+*
+*/
+core.irq.unregisterCallback:
+  jsr core.irq.init
+  rts
+
+/**
+* stops irqs from happening immediately
+*/
+core.irq.stop:
+  php
+  sep #$20
+
+  lda.l GLOBAL.interruptFlags
+  and #(NMITIMEN_Y_IRQ_ENABLE | NMITIMEN_X_IRQ_ENABLE) ~$ff
+  sta.l GLOBAL.interruptFlags
+  sta.l NMITIMEN
+
+  plp
+  rts
+
+/**
+*
+*/
+core.irq.init:
+  rep #$31
+  lda #core.irq.callback.void
+  sta.l GLOBAL.irq.callback
+  jsr core.irq.stop
+  rts
+
+/**
+*
+*/
+core.irq.callback.void:
+  TRIGGER_ERROR E_NoIrqCallback
+
+
+core.irq.play:
+
+;switch to 16bit a/x in order to preserve everything and not just 8bit of the accu
+	rep #$39		
+	pha
+	phx
+	phy
+	phd
+	phb	
+    pea VARS
+    pld
+    pea RAM | (RAM << 8)
+    plb
+    plb
+
+    ;jsr _switchDashboard
+	;bra _detectedUnhandledIrq
+
+    jsr core.nmi.stop
+/*    sep #$20
+    lda #0
+    sta.l NMITIMEN*/
+
+    ;jump to registered callback if valid
+    rep #$31
+    lda.w GLOBAL.irq.callback
+    tax
+    dex
+    dex
+    dex
+    dex
+    dex
+    dex
+    lda.l (ROM << 16),x
+    cmp #IRQ_MAGIC
+    beq +
+      TRIGGER_ERROR E_BadIrqCallback
+
++
+    lda.w GLOBAL.irq.callback
+    dec a
+    pea _return-1   ;push return adress
+    pha ;push callback adress
+    rts ;this is actually a jump to subroutine on stack, then return
+
+_return:
+
+
+    ;jsr _switchDashboard
+    jsr core.nmi.start
+    sep #$20
+/*    lda.w GLOBAL.interruptFlags
+    sta.l NMITIMEN*/
+    lda.l TIMEUP
+    rep #$39
+
+    plb
+    pld
+    ply
+    plx
+    pla
+    rti
+
+_detectedUnhandledIrq:
+  TRIGGER_ERROR E_UnhandledIrq
+
+
+;quick & dirty hack
+_switchDashboard:
+  
+  php
+  rep #$31
+  sep #$20
+  lda.l colorAdditionSelect
+  ora #CGWSEL_DIRECT_COLOR_MODE
+  sta.w CGWSEL
+
+  lda.l MainScreen
+  and #T_BG2_ENABLE ~$ff
+  ora #T_BG1_ENABLE
+  sta.w TMAIN
+
+  stz.w TSUB
+  lda #BGMODE_MODE_3
+  sta.w BGMODE
+
+  lda.l GLOBAL.irq.buffer
+  sta.w BG12NBA
+
+  lda.l GLOBAL.irq.buffer + 1
+  sta.w BG1SC
+  
+  lda.l GLOBAL.irq.buffer + 2
+  sta.w BG1VOFS
+  lda.l GLOBAL.irq.buffer + 3
+  sta.w BG1VOFS
+
+  lda.l GLOBAL.irq.buffer + 4
+  sta.w BG1HOFS
+  lda.l GLOBAL.irq.buffer + 5
+  sta.w BG1HOFS
+
+  plp
+  rts
+	
+.ends
+

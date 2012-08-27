@@ -1,0 +1,1199 @@
+/**
+* msu 1 handler, plays video files
+* 
+* init: makes sure msu1 is present, make sure msu-file contains correct data
+* kill: ?
+* play: if video active, continue uploading frames
+* playvideo: start playing video according to: input:chapterId(also starts playing audio track with same id)
+* stopvideo: yeah...
+* getCurrentFrame: return current frame number
+*/
+.include "src/object/msu1/msu1.h"
+.section "msu1"
+
+  METHOD init
+  sep #$20
+  jsr core.nmi.stop
+
+  jsr _isMsu1Present
+  bcs +
+    TRIGGER_ERROR E_Msu1NotPresent
+
++
+  jsr _isMsu1FilePresent
+  bcs +
+    TRIGGER_ERROR E_Msu1FileNotPresent
+
++
+  jsr _stopAudioTrack
+  jsr _setupVideoConfig
+
+
+  jsr _getVideoMode
+  stz.b this.videoMode
+  rol.b this.videoMode
+
+  jsr core.nmi.start
+
+  stz.b this.videoPlaying
+  ;stz.w GLOBAL.videoPlaying
+  rep #$31
+  stz.b this.currentFrame
+  sep #$20
+  stz.b this.currentChapter
+  rep #$31  
+  stz.w GLOBAL.currentFrame
+
+  NEW Background.framebuffer.CLS.PTR this.framebuffer.1.obj PALETTE.BPP.4 BG.LAYER.0 0 MSU1.FRAMEBUFFER.TILESIZE MSU1.FRAMEBUFFER.PALETTESIZE
+  NEW Background.framebuffer.CLS.PTR this.framebuffer.2.obj PALETTE.BPP.4 BG.LAYER.1 0 MSU1.FRAMEBUFFER.TILESIZE 0
+
+  CALL Background.framebuffer.makePhysical.MTD this.framebuffer.1.obj
+
+  lda.w #MALLOC.TILEMAP
+  CALL Background.framebuffer.getAllocatedMemory.MTD this.framebuffer.1.obj
+  stx.b this.framebuffer.1.tilemap
+
+  lda.w #MALLOC.TILES
+  CALL Background.framebuffer.getAllocatedMemory.MTD this.framebuffer.1.obj
+  stx.b this.framebuffer.1.tiles
+
+  lda.w #MALLOC.PALETTE
+  CALL Background.framebuffer.getAllocatedMemory.MTD this.framebuffer.1.obj 
+  stx.b this.framebuffer.1.palette
+  stx.b this.framebuffer.2.palette
+
+  CALL Background.framebuffer.makePhysical.MTD this.framebuffer.2.obj
+
+  lda.w #MALLOC.TILEMAP
+  CALL Background.framebuffer.getAllocatedMemory.MTD this.framebuffer.2.obj
+  stx.b this.framebuffer.2.tilemap
+
+  lda.w #MALLOC.TILES
+  CALL Background.framebuffer.getAllocatedMemory.MTD this.framebuffer.2.obj
+  stx.b this.framebuffer.2.tiles
+  
+  lda.w #V_SCROLL
+  sta.w yScrollBG1
+  lda.w #V_SCROLL
+  sta.w yScrollBG2
+
+  stz.b this.framebuffer.current.pointer
+  sep #$20
+  lda.b #BGMODE_MODE_1
+  sta.w ScreenMode
+
+  lda #CGWSEL_CLIP_COL_INSIDE
+  sta.w colorAdditionSelect
+  
+  lda.w MainScreen
+  and.b #(T_BG1_ENABLE | T_BG2_ENABLE) ~$ff
+  sta.w MainScreen 
+
+  lda.b this.videoMode
+  ;NEW VideoMask.CLS.PTR this.videoMask
+
+  rts
+
+  METHOD play
+  php
+
+  sep #$20
+  ;only load new video after current frame cycle has finished
+  lda.b this.frameBusy
+  bne +
+	lda.b this.nextChapter
+	bpl +
+      lda.b this.frameWait
+      beq ++
+        dec.b this.frameWait
+        plp
+        rts
+++
+	  jsr _startNextVideo
+
++
+  rep #$31
+
+  lda.b this.videoPlaying
+  ;don't terminate immediately. instead, let current cycle finish, then stop
+  ora.b this.frameBusy
+  and.w #$ff
+  bne +
+
+	plp
+	rts
+
++ jsr core.nmi.stop
+  lda.b this.frameCycle
+  and.w #MSU1_FRAME_CYCLE_COUNT
+  asl a
+  tax
+  sep #$20
+  inc.b this.frameCycle
+  lda.b this.videoMode
+
+  beq +
+	jsr (_frameCycleLUT24fpsPAL,x)
+	bra ++
++
+	jsr (_frameCycleLUT24fpsNTSC,x)
+++
+  jsr _checkTrackEnd
+  jsr core.nmi.start
+  plp
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr _stop
+
+  ;CALL VideoMask.kill.MTD this.videoMask
+  CALL Background.framebuffer.kill.MTD this.framebuffer.1.obj
+  CALL Background.framebuffer.kill.MTD this.framebuffer.2.obj
+
+  lda #OBJR_kill
+  sta 3,s
+  rts
+
+/**
+* mutes msu1 audio output if song is not playing anymore.
+* this isn't really part of msu1 spec, but sd2snes outputs static if end of track reached
+* also checks for audio error flag
+*/
+_checkTrackEnd:
+  php
+  sep #$20
+  lda.l MSU_STATUS
+  and.b #MSU_STATUS_AUDIO_PLAY
+  bne +
+	lda.b #MSU_VOLUME_MUTE
+	sta.l MSU_VOLUME
+
++
+
+  plp
+  rts
+
+/**
+* @return c <bool>	true if done playing chapter
+*/
+  METHOD isDone
+  php
+  sep #$20
+  lda this.videoPlaying
+  bne +
+	plp
+	sec
+	rts
+
++
+  plp
+  clc
+  rts
+
+;normal 2:3 pulldown ntsc
+_frameCycleLUT24fpsNTSC:
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _resetFrameCycle
+  ;.dw _ntscSucks
+
+
+;24fps 2:3 pulldown pal
+_frameCycleLUT24fpsPAL:
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _uploadFirstChunk
+  .dw _uploadSecondChunk
+  .dw _resetFrameCycle
+
+_uploadSecondChunk_resetFrameCycle:
+  jsr _uploadSecondChunk
+  jsr _resetFrameCycle
+  rts
+
+_nop
+  rts
+
+_ntscSucks:
+  TRIGGER_ERROR E_NtscUnsupported
+
+/**
+* initialize msu1 frame pointer, upload tilemap, first tile chunk
+*/
+_uploadFirstChunk:
+
+  ;only seek to current frame if it isn't already pointed at (reduce seek overhead)
+  sep #$20
+  lda.l MSU_DATA	;get id
+  xba
+  lda.l MSU_DATA
+  xba
+  rep #$31  
+
+  cmp this.currentFrame
+  beq +
+	lda this.currentFrame
+	jsr _msu1SeekToFrame
+	sep #$20
+	lda.l MSU_DATA	;get id
+	xba
+	lda.l MSU_DATA
+	xba
+	rep #$31  
+    cmp this.currentFrame
+    beq +
+      ;if reseek didn't help, frame is broken
+      pei (this.currentChapter)
+      pha
+      TRIGGER_ERROR E_Msu1FrameBad
+	
++
+
+/*
+  ;commenting out below lines works sort of, but causes illegal dma transfers sometimes
+  lda.b this.currentFrame
+  jsr _msu1SeekToFrame
+*/
+
+  jsr _msu1SetupFrameLength
+
+  ;toggle between framebuffers
+  lda.b this.framebuffer.current.pointer
+  eor.w #this.framebuffer.2.obj - this.framebuffer.1.obj
+  sta.b this.framebuffer.current.pointer
+
+  ;transfer tilemap
+  tsx
+  sep #$20
+  lda #TRUE
+  sta this.frameBusy
+
+  lda #DMA_TRANSFER.VRAM | DMA_TRANSFER.OPTION.FIXED_SOURCE		;transfer type
+  pha
+  pea MSU_DATA	;source adress
+  lda #0		;source bank
+  pha
+  rep #$31
+  phx
+  ldx.b this.framebuffer.current.pointer
+  lda.b this.framebuffer.1.tilemap,x
+  plx
+  pha
+
+  ;pei (this.tilemapLength)
+  lda this.tilemapLength
+  cmp #VRAM_TILEMAP.LENGTH
+  bcc +
+    lda #VRAM_TILEMAP.LENGTH
++  
+  pha
+  
+  jsr core.dma.registerTransfer
+  txs
+  bcs +
+    TRIGGER_ERROR E_DmaQueueFull
+
++ ;transfer tiles
+  tsx
+  sep #$20
+  lda #DMA_TRANSFER.VRAM | DMA_TRANSFER.OPTION.FIXED_SOURCE		;transfer type
+  pha
+  pea MSU_DATA	;source adress
+  lda #0		;source bank
+  pha
+
+  rep #$31
+  phx
+  ldx.b this.framebuffer.current.pointer
+  lda.b this.framebuffer.1.tiles,x
+  plx
+  pha
+
+;  pei (this.tilesLength)
+  
+  ;check if tile transfer has to be splitted between two frames
+  stz.b this.tileTransferRemainder
+  
+  ;always upload half of total tilellength first to even out transfer load
+  lda.b this.tilesLength
+  lsr a
+  cmp.w #MSU1_MAX_TILE_TRANSFER_LENGTH
+  bcc +
+    lda.w #MSU1_MAX_TILE_TRANSFER_LENGTH
++ sta.b this.tileTransferRemainder
+  pha
+  
+/*  
+  lda.b this.tilesLength
+  cmp.w #MSU1_MAX_TILE_TRANSFER_LENGTH
+  bcc +
+	sec
+	sbc.w #MSU1_MAX_TILE_TRANSFER_LENGTH
+	sta.b this.tileTransferRemainder
+	lda.w #MSU1_MAX_TILE_TRANSFER_LENGTH
+
++ pha
+*/
+  ;never register empty transfer
+;  sec
+  ;beq +
+    jsr core.dma.registerTransfer
++    
+  txs
+  bcs +
+    TRIGGER_ERROR E_DmaQueueFull
+
++
+  rts
+
+/**
+* determine video mode (pal/ntsc)
+* don't check $213f, but cycle-count how long a frame takes instead
+*
+* @return c<bool>	set if PAL mode detected, clear if NTSC mode detected
+*/
+_getVideoMode:
+  php
+  rep #$31
+  sep #$20
+  lda #0
+  sta.l MEMSEL
+  ldx #$ffff
+-	lda.l HVBJOY
+	bmi -
+
+-	lda.l HVBJOY
+	bpl -
+
+-	inx
+	lda.l HVBJOY
+	bmi -
+  cpx.w #MSU1_VIDEOMODE_THRESHOLD
+  bcc _isNtsc
+  
+  lda #MEMSEL_FASTROM_ENABLE
+  sta.l MEMSEL
+
+  plp
+  sec
+  rts
+
+_isNtsc:
+  lda #MEMSEL_FASTROM_ENABLE
+  sta.l MEMSEL
+  
+  ;reserve a bit more blanking time for NTSC mode.
+  jsr core.irq.position.get
+  ldy.w #IRQ.VPOS.NTSC
+  jsr core.irq.position.set
+  
+  plp
+  clc
+  rts
+
+/**
+* upload optional second tile chunk, palette, toggle frame buffer
+*/
+_uploadSecondChunk:
+  rep #$31
+
+  ;transfer tiles, optional second part
+  lda.b this.tileTransferRemainder
+  beq +
+	tsx
+	sep #$20
+	lda #DMA_TRANSFER.VRAM | DMA_TRANSFER.OPTION.FIXED_SOURCE		;transfer type
+	pha
+	pea MSU_DATA	;source adress
+	lda #0		;source bank
+	pha
+
+	rep #$31
+	phx
+	ldx.b this.framebuffer.current.pointer
+	lda.b this.framebuffer.1.tiles,x
+	clc
+	;adc.w #MSU1_MAX_TILE_TRANSFER_LENGTH
+	adc.b this.tileTransferRemainder
+	plx
+	pha
+;	pei (this.tileTransferRemainder)
+
+    lda this.tileTransferRemainder
+    cmp.w #MSU1_MAX_TILE_TRANSFER_LENGTH
+    bcc ++
+      lda.w #MSU1_MAX_TILE_TRANSFER_LENGTH
+++    
+    pha
+
+	jsr core.dma.registerTransfer
+	txs
+	bcs +
+      TRIGGER_ERROR E_DmaQueueFull
+
++ ;transfer palette
+  tsx
+  ;this does not work because second tile chunk and palette are uploaded on the same frame, you can't change adress in between
+  ;jsr _msu1SeekToCurrentFramePalette
+  sep #$20
+  lda #DMA_TRANSFER.CGRAM | DMA_TRANSFER.OPTION.FIXED_SOURCE		;transfer type
+  pha
+  pea MSU_DATA	;source adress
+  lda #0		;source bank
+  pha
+
+  rep #$31
+  phx
+  ldx.b this.framebuffer.current.pointer
+  lda.b this.framebuffer.1.palette,x
+  plx
+  pha
+
+  pei (this.paletteLength)
+
+  jsr core.dma.registerTransfer
+  txs
+  bcs +
+    TRIGGER_ERROR E_DmaQueueFull
+
++
+  ;hacky crap: dont update frame counter if we're just finishing current framecycle
+;  lda.b this.videoPlaying
+  ;and.w #TRUE
+;  beq +
+	jsr _incrementFrame
+
+  ;toggle layers
+;+
+  lda.w MainScreen
+  bit.w #(T_BG1_ENABLE | T_BG2_ENABLE)
+  bne +
+	ora.w #T_BG1_ENABLE
+
++ eor.w #T_BG1_ENABLE | T_BG2_ENABLE
+  sta.w MainScreen
+
+;  lda #CGWSEL_CLIP_COL_INSIDE
+;  sta.w colorAdditionSelect
+
+  lda #FALSE
+  sta this.frameBusy
+
+  rts
+
+_incrementFrame:
+  php
+  ;increment frame (wrap-around),
+  rep #$31
+  lda.b this.currentFrame
+  inc a
+  cmp.b this.frameCount
+  bcc +
+	;chapter complete
+	/*lda.b this.currentChapter
+	inc a
+	jsr _playVideo*/
+	jsr _stop
+	lda.b this.currentFrame
+	jsr _msu1SeekToFrame
+
+	;rts
+
++ sta.b this.currentFrame
+  sta.w GLOBAL.currentFrame
+
+  plp
+  rts
+/**
+* repeat cycle
+*/
+_resetFrameCycle:
+  sep #$20
+  stz.b this.frameCycle
+  rts
+
+
+/**
+* yeah...
+*/
+_invalidCycle:
+  txa
+  lsr a
+  pha
+  TRIGGER_ERROR E_Msu1InvalidFrameCycle
+
+
+/**
+* get length of palette, tilemap and tiles from header
+* after returning, msu1 data-file adress points to start of palette data
+* 
+*/
+_msu1SetupFrameLength:
+  php
+  sep #$20
+  lda.l MSU_DATA
+  sta.b this.tmp
+  lda.l MSU_DATA
+  sta.b this.tmp+1
+  lda.l MSU_DATA
+  sta.b this.tmp+2
+  lda.l MSU_DATA
+  sta.b this.tmp+3
+
+  rep #$31
+  lda.b this.tmp
+  and.w #$7ff
+  asl a
+  ;this is an error condition, but we won't raise it and swallow the bad frame instead
+  cmp.w #TILEMAP.SIZE.SINGLE
+  bcc +
+    lda.w #TILEMAP.SIZE.SINGLE
+    
++  
+  sta.b this.tilemapLength
+
+  lda.b this.bpp
+  and.w #$ff
+  tax
+  lda.b this.tmp+1
+  lsr a
+  lsr a
+  lsr a
+  and.w #$7ff
+-	asl a
+	dex
+	bne -
+
+  ;this is an error condition, but we won't raise it and swallow the bad frame instead
+  cmp.w #MSU1.FRAMEBUFFER.TILESIZE
+  bcc +
+    lda.w #MSU1.FRAMEBUFFER.TILESIZE
++
+  sta.b this.tilesLength
+
+  lda.b this.tmp+2
+  asl a
+  asl a
+  xba
+  and.w #$ff
+  asl a
+  sta.b this.paletteLength
+  plp
+  rts
+
+/**
+* get pointer to palette of current frame
+*
+*/
+_msu1SeekToCurrentFramePalette:
+  phx
+  php
+  rep #$31
+  tsx
+  pha
+  pha
+  lda.w #MSU1_FRAME.FRAMEDATA
+  clc
+  adc this.tilemapLength
+  clc
+  adc this.tilesLength
+  clc
+  adc this.currentFramePointer
+
+  sta 3,s
+  lda this.currentFramePointer+2
+  adc.w #0
+  sta 1,s
+
+;  pei (this.tmp)
+  ;pei (this.tmp+2)
+  jsr _msu1SetAdress
+  txs
+  plp
+  plx
+  rts
+
+/**
+* get pointer to current chapter and set msu1 data-file pointer accordingly
+*
+* @param a int,8bit	chapter number to seek to
+*/
+_msu1SeekToChapter:
+  php
+  rep #$31
+  and.w #$ff
+  asl a
+  asl a
+  clc
+  adc.w #MSU1_FILE.POINTER
+
+  tsx
+  pha
+  pea 0
+  jsr _msu1SetAdress
+  txs
+
+  sep #$20
+  lda.l MSU_DATA
+  sta.b this.currentChapterPointer
+  lda.l MSU_DATA
+  sta.b this.currentChapterPointer+1
+  lda.l MSU_DATA
+  sta.b this.currentChapterPointer+2
+  lda.l MSU_DATA
+  sta.b this.currentChapterPointer+3
+
+  rep #$31
+  tsx
+  pei (this.currentChapterPointer)
+  pei (this.currentChapterPointer+2)
+  jsr _msu1SetAdress
+  txs
+  plp
+  rts
+
+/**
+* get pointer to current frame and set msu1 data-file pointer accordingly
+*
+* assumes that msu1SeekToChapter has been called and this.currentChapterPointer has been set accordingly before!
+* @param a int,16bit	frame number to seek to
+*/
+_msu1SeekToFrame:
+  pha
+  php
+  rep #$31
+  cmp.b this.frameCount
+  bcc +
+    TRIGGER_ERROR E_Msu1InvalidFrameRequested
+
++ sta.b this.tmp
+  stz.b this.tmp+2
+  rol.b this.tmp
+  rol.b this.tmp+2
+  clc
+  rol.b this.tmp
+  rol.b this.tmp+2
+
+  lda.b this.tmp
+  clc
+  adc.w #MSU1_CHAPTER.POINTER
+  sta.b this.tmp
+  bcc +
+	inc.b this.tmp+2
++ lda.b this.tmp
+
+  clc
+  adc.b this.currentChapterPointer
+  sta.b this.tmp
+  bcc +
+	inc.b this.tmp+2
++ lda.b this.tmp+2
+  clc
+  adc.b this.currentChapterPointer+2
+  sta.b this.tmp+2
+
+  tsx
+  pei (this.tmp)
+  pei (this.tmp+2)
+  jsr _msu1SetAdress
+  txs
+
+  sep #$20
+  lda.l MSU_DATA
+  sta.b this.currentFramePointer
+  lda.l MSU_DATA
+  sta.b this.currentFramePointer+1
+  lda.l MSU_DATA
+  sta.b this.currentFramePointer+2
+  lda.l MSU_DATA
+  sta.b this.currentFramePointer+3
+
+
+  rep #$31
+  tsx
+  pei (this.currentFramePointer)
+  pei (this.currentFramePointer+2)
+  jsr _msu1SetAdress
+  txs
+
+  plp
+  pla
+  rts
+
+
+_delay:
+  phx
+  php
+  rep #$31
+  ldx #8000
+-	dex
+	nop
+	nop
+	nop
+	nop
+	bne -
+
+  plp
+  plx
+  rts
+
+/**
+* start playing video
+*
+* @param a int,16bit	scene number to play
+*/
+  METHOD playVideo
+  php
+
+  sep #$20
+  cmp.b this.chapterCount
+  bcc +
+    TRIGGER_ERROR E_Msu1InvalidChapterRequested
+
++ ;seek to chapter
+  ora.b #MSU1_NEXT_VIDEO_SCHEDULED
+  sta.b this.nextChapter
+  lda #MSU1_NEXT_VIDEO_DELAY
+  sta.b this.frameWait
+  
+  rep #$31
+  stz.b this.currentFrame
+  stz.w GLOBAL.currentFrame
+;  jsr _stopVideo
+  plp
+  rts
+
+_startNextVideo:
+  php
+  rep #$31
+  sep #$20
+  jsr core.nmi.stop
+
+  lda.b this.nextChapter
+  and.b #MSU1_NEXT_VIDEO_SCHEDULED ~$ff
+  sta.b this.nextChapter
+  sta.b this.currentChapter
+  jsr _msu1SeekToChapter
+  ;chapter id in msu1 data file must match
+  lda.l MSU_DATA
+  cmp.b this.currentChapter
+  beq +
+    ;retry once
+    lda.b this.currentChapter
+    jsr _msu1SeekToChapter
+    lda.l MSU_DATA
+    cmp.b this.currentChapter
+    beq +
+      ;die
+      pei (this.currentChapter)
+      TRIGGER_ERROR E_Msu1InvalidChapter
+
++ lda.l MSU_DATA
+  sta.b this.frameCount
+  lda.l MSU_DATA
+  sta.b this.frameCount+1
+
+  lda.b #TRUE
+  sta.b this.videoPlaying
+  ;sta.w GLOBAL.videoPlaying
+
+/*  lda.w MainScreen
+  and.b #(T_BG1_ENABLE | T_BG2_ENABLE) ~$ff
+  sta.w MainScreen*/
+
+;  lda #CGWSEL_CLIP_COL_ALWAYS
+;  sta.w colorAdditionSelect
+
+  ;jsr _resetFrameCycle
+  lda.b this.currentChapter
+  jsr _playAudio
+
+  rep #$31
+  stz.b this.currentFrame
+  ;stz.b this.framebuffer.current.pointer
+  
+  ;lda #0
+  stz.w GLOBAL.currentFrame
+
+  lda.b this.currentFrame
+  jsr _msu1SeekToFrame
+
+  jsr core.nmi.start
+
+  plp
+  rts
+
+  METHOD stop
+  php
+  sep #$20
+
+  stz.w GLOBAL.currentFrame
+  stz.b this.videoPlaying
+  ;stz.w GLOBAL.videoPlaying
+  jsr _stopAudioTrack
+  plp
+  rts
+
+  METHOD getCurrentFrame
+  php
+  rep #$31
+  lda.b this.currentFrame
+  plp
+  rts
+
+
+/**
+* returns carry set if msu1 hardware was found
+*
+* @return carry bool	set if ok
+*/
+_isMsu1Present:
+  php
+  rep #$31
+  sep #$20
+  ldx.w #0
+-	lda.l MSU_ID,x
+	cmp.l msu1HardwareIdentifier,x
+	bne _msu1Missing
+	inx
+	cpx #msu1HardwareIdentifier.end-msu1HardwareIdentifier
+	bne -
+  plp
+  sec
+  rts
+
+_msu1Missing:
+  plp
+  clc
+  rts
+
+/**
+* returns carry set if msu1 datafile contains correct signature ("S-MSU1" + matching game title)
+*
+* @return carry bool	set if ok
+*/
+_isMsu1FilePresent:
+  php
+  rep #$31
+  sep #$20
+  
+  tsx
+  pea MSU1_FILE.ID
+  pea MSU1_FILE.ID >> 16
+  jsr _msu1SetAdress
+  txs
+
+  ldx.w #0
+-	lda.l MSU_DATA
+	cmp.l msu1HardwareIdentifier,x
+	bne _msu1FileMissing
+	inx
+	cpx #msu1HardwareIdentifier.end-msu1HardwareIdentifier
+	bne -
+
+  tsx
+  pea MSU1_FILE.TITLE
+  pea MSU1_FILE.TITLE >> 16
+  jsr _msu1SetAdress
+  txs
+
+  ldx.w #0
+-	lda.l MSU_DATA
+	cmp.l SNESHEADER.TITLE,x
+	bne _msu1FileMissing
+	inx
+	cpx #MSU1_FILE.TITLE.LEN
+	bne -
+  plp
+  sec
+  rts
+
+_msu1FileMissing:
+  plp
+  clc
+  rts
+
+
+/**
+* seek to specified position in msu1 data file and wait for ack.
+* triggers exception if msu1 doesn't respond in time.
+*
+* @param stack int	32bit adress to seek to
+*/
+_msu1SetAdress:
+  php
+  rep #$31
+  phx
+  lda 8,s
+  sta.l MSU_ADRESS
+  lda 6,s
+  sta.l MSU_ADRESS+2
+
+  nop   ;some delay seems to be required, otherwise, sd2snes sometimes reads from wrong address
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  nop
+  
+  sep #$20
+  ldx.w #MSU1_SEEK_TIMEOUT
+-	dex
+	beq _msu1SetAdressTimeout
+	lda.l MSU_STATUS
+	bmi -
+/*
+  ;artificial wait
+  ldx.w #MSU1_SEEK_TIMEOUT
+-   dex
+    nop
+    nop
+    nop
+    nop
+	bne -
+*/
+  plx
+  plp
+  rts
+
+
+_msu1SetAdressTimeout:
+  TRIGGER_ERROR E_Msu1SeekTimeout
+
+
+/**
+* get video config from msu1 data file header and store in object member vars
+*/
+_setupVideoConfig:
+  php
+  rep #$31
+  sep #$20
+
+  tsx
+  pea MSU1_FILE.BPP
+  pea MSU1_FILE.BPP >> 16
+  jsr _msu1SetAdress
+  txs
+
+  lda.l MSU_DATA
+  sta.b this.bpp
+
+  tsx
+  pea MSU1_FILE.FPS
+  pea MSU1_FILE.FPS >> 16
+  jsr _msu1SetAdress
+  txs
+
+  lda.l MSU_DATA
+  sta.b this.fps
+
+  tsx
+  pea MSU1_FILE.CHAPTERCOUNT
+  pea MSU1_FILE.CHAPTERCOUNT >> 16
+  jsr _msu1SetAdress
+  txs
+
+  lda.l MSU_DATA
+  sta.b this.chapterCount
+
+  plp
+  rts
+
+/**
+* stops audio track, trigger error if hardware is not responding.
+*
+*/
+_stopAudioTrack:
+  php
+  rep #$31
+  sep #$20
+
+  ;set volume
+  lda.b #MSU_VOLUME_MUTE
+  sta.l MSU_VOLUME
+
+  ;stop track
+  lda.b #0
+  sta.l MSU_TRACK	;necessary because audio busy flag is set by default(for whatever reason)
+  sta.l MSU_TRACK+1
+  sta.l MSU_CONTROL
+  jsr _waitAudioBusy
+
+  /* @todo
+  ;check if msu1 actually stopped playing
+  lda.l MSU_STATUS
+  and.b #MSU_STATUS_AUDIO_PLAY
+  bne _msu1playAudioError
+  */
+
+
+  plp
+  rts
+
+
+/**
+* play audio track, trigger error if track is non-existant/hardware is not responding. Stops any playing track
+*
+* @param a int,8bit	track to play
+*/
+  METHOD playAudio
+  php
+  rep #$31
+  sep #$20
+  sta.b this.currentTrack
+
+  jsr _stopAudioTrack
+
+  ;set volume
+  lda.b #MSU_VOLUME_FULL
+  sta.l MSU_VOLUME
+
+  ;set track
+  lda.b this.currentTrack
+  sta.l MSU_TRACK
+  lda.b #0
+  sta.l MSU_TRACK+1
+  jsr _waitAudioBusy
+
+  ;start playing track
+  lda.b #MSU_CONTROL_PLAY
+  sta.l MSU_CONTROL
+  jsr _waitAudioBusy
+
+  ;check if error occured while seeking to audio track
+  lda.l MSU_STATUS
+  and.b #MSU_STATUS_AUDIO_ERROR
+  bne _msu1playAudioError
+
+  plp
+  rts
+
+_msu1playAudioTimeout:
+  pei (this.currentTrack)
+  TRIGGER_ERROR E_Msu1AudioSeekTimeout
+
+  plp
+  rts
+
+_msu1playAudioError:
+  pei (this.currentTrack)
+  TRIGGER_ERROR E_Msu1AudioPlayError
+
+  plp
+  rts
+
+_waitAudioBusy:
+  php
+  rep #$31
+  sep #$20
+  nop
+  nop
+  nop
+  nop
+  ldx.w #MSU1_SEEK_TIMEOUT
+
+-	dex
+;	beq _msu1playAudioTimeout
+	lda.l MSU_STATUS
+	and.b #MSU_STATUS_AUDIO_BUSY
+	bne -
+
+  plp
+  rts
+
+/**
+* global state hack. Checks whether input frame number has been met.
+*
+* @param a<int,16bit>	frame number to check
+* @return c<bool>	true if requested frame number has been met
+*/
+GLOBAL.checkFrameReached:
+  rep #$31
+  pha
+/*
+  lda.w GLOBAL.videoPlaying
+  and.w #TRUE
+;  bne +
+	clc
+	pla
+	rts
+
++
+*/
+  lda.w GLOBAL.currentFrame
+  ;stupid, stupid hack because suddenly, some chapters in the msu1 file are missing a frame or two, wtf ????
+  ;inc a
+  ;inc a
+  cmp 1,s
+
+  pla
+  rts
+
+/**
+* pause video playback
+*/
+  METHOD pause
+  php
+  sep #$20
+  stz.b this.videoPlaying
+
+  ;mute audio
+  lda.b #MSU_VOLUME_MUTE
+  sta.l MSU_VOLUME
+
+  ;pause audio
+  lda.b #0
+  sta.l MSU_CONTROL
+
+  plp
+  rts
+
+/**
+* pause video playback
+*/
+  METHOD resume
+  php
+  sep #$20
+  lda.b #TRUE
+  sta.b this.videoPlaying
+
+  ;turn up volume
+  lda.b #MSU_VOLUME_FULL
+  sta.l MSU_VOLUME
+
+  ;unpause audio
+  lda.b #MSU_CONTROL_PLAY
+  sta.l MSU_CONTROL
+
+  plp
+  rts
+
+
+  CLASS Msu1 playVideo stop pause resume isDone getCurrentFrame
+.ends	
+	

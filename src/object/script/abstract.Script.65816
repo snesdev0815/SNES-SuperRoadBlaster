@@ -1,0 +1,71 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/script/abstract.Script.h"
+.section "abstract.Script"
+
+  METHOD init
+  METHOD play
+  METHOD kill
+  rep #$31
+  TRIGGER_ERROR E_abstractClass
+  rts
+
+/**
+* inits individual, relative script time-counter
+*
+*/
+abstract.Script.initAge:
+  php
+  rep #$31
+  lda.w FrameCounter
+  sta.b script.timestamp.start
+  plp
+  rts
+
+/**
+* returns script age in frames
+*
+*/
+abstract.Script.getAge:
+  php
+  rep #$31
+  lda.w FrameCounter
+  sec
+  sbc.b script.timestamp.start
+  plp
+  rts
+
+/**
+* check whether input age has been exceeded
+*
+*/
+abstract.Script.ageExceeded:
+  php
+  rep #$31
+  pha
+  lda.w FrameCounter
+  sec
+  sbc.b script.timestamp.start
+  cmp 1,s
+  bcc +
+
+	pla
+	plp
+	sec
+	rts
+
++ pla
+  plp
+  clc
+  rts
+
+abstract.Script.killAll:
+  php
+  plp
+  rts
+
+  CLASS abstract.Script
+.ends	
+	

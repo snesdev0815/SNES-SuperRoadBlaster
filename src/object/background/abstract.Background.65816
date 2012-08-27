@@ -1,0 +1,584 @@
+/**
+* abstract Sprite methods
+*
+*/
+
+
+.include "src/object/background/abstract.Background.h"
+.section "abstract.Background"
+
+  METHOD init
+  METHOD play
+  METHOD kill
+  rep #$31
+  TRIGGER_ERROR E_abstractClass
+  rts
+
+/**
+* start animation, allocate required memory
+*
+* @param a<int, 16bit>	animation id, @see BackgroundAnimationLUT.
+*
+* @return c<bool>	true if init ok. could fail if no more vram space left or something like that.
+*/
+abstract.Background.startAnimation:
+  php
+  rep #$31
+
+  ;init some vars
+
+  ;stx.b animation.isColorMath
+  ;sty.b animation.isLooping
+
+  and.w #$ff
+  sta.b animation.id
+  asl a
+  adc.b animation.id
+  tax
+  lda.l BackgroundAnimationLUT,x
+  sta.b animation.pointer
+  lda.l BackgroundAnimationLUT + 1,x
+  sta.b animation.pointer + 1
+
+  ;check animation header magic
+  ldy.w #ANIMATION.MAGIC
+  lda.b [animation.pointer], y
+  cmp.w #ANIMATION.MAGIC.VALUE
+  beq +
+	pei (animation.id)
+    TRIGGER_ERROR E_BadBgAnimation
+
+  ;fetch animation config
++ ldy.w #ANIMATION.MAX.TILES
+  lda.b [animation.pointer], y
+  sta.b animation.tiles.length
+
+  ldy.w #ANIMATION.MAX.PALETTE
+  lda.b [animation.pointer], y
+  sta.b animation.palette.length
+
+  ldy.w #ANIMATION.MAX.FRAMES
+  lda.b [animation.pointer], y
+  sta.b animation.frame.max
+
+  sep #$20
+  ldy.w #ANIMATION.BPP
+  lda.b [animation.pointer], y
+  sta.b animation.tiles.bpp
+  rep #$31
+
+  ;@todo, this is a hack. Should be defined in animation file
+  lda.w #BG.TILEMAP.LENGTH
+  sta.b animation.tilemap.length
+
+  jsr abstract.Background.deallocate
+  ;jsr _allocateMemory
+  
+  stz.b animation.frame.current
+  stz.b animation.frame.last
+  dec.b animation.frame.last
+  sep #$20
+
+  lda.b #1
+  sta.b animation.isPlaying
+
+  plp
+  sec
+  rts
+
+/**
+*
+*/
+abstract.Background.stopAnimation:
+  php
+  sep #$20
+  stz.b animation.isPlaying
+  plp
+  rts
+
+/**
+*
+*/
+abstract.Background.isAnimationPlaying:
+  php
+  sep #$20
+  lda.b animation.isPlaying
+  plp
+  rts
+
+/**
+*
+*/
+abstract.Background.playAnimation:
+  php
+  rep #$31
+  lda.b animation.frame.current
+  asl a
+  adc.w #ANIMATION.FRAME.POINTER
+  tay
+  lda.b animation.pointer+1
+  sta.b animation.frame.pointer+1
+
+  lda.b [animation.pointer],y
+  clc
+  adc.b animation.pointer
+  sta.b animation.frame.pointer
+
+  ldy.w #ANIMATION.FRAME.TILES.LENGTH
+  lda.b [animation.frame.pointer],y
+  cmp.b animation.tiles.length
+  bcc +
+  beq +
+    pei (animation.id)
+    pei (animation.frame.current)
+    TRIGGER_ERROR E_AllocatedVramExceeded
+
++
+  sta.b animation.frame.tiles.length
+
+  ldy.w #ANIMATION.FRAME.TILEMAP.LENGTH
+  lda.b [animation.frame.pointer],y
+  cmp.b animation.tilemap.length
+  bcc +
+  beq +
+    /*pei (animation.id)
+    pei (animation.frame.current)
+    TRIGGER_ERROR E_AllocatedVramExceeded*/
+    ;fail silently in case tilemap length has been forced to be lower
+    lda.b animation.tilemap.length
++
+  sta.b animation.frame.tilemap.length
+
+  ldy.w #ANIMATION.FRAME.PALETTE.LENGTH
+  lda.b [animation.frame.pointer],y
+  cmp.b animation.palette.length
+  bcc +
+  beq +
+	  /*pei (animation.id)
+	  pei (animation.frame.current)
+      TRIGGER_ERROR E_AllocatedCgramExceeded*/
+      ;fail silently in case palette length has been forced to be lower
+      lda.b animation.palette.length
++
+  sta.b animation.frame.palette.length
+
+  lda.b animation.frame.current
+  cmp.b animation.frame.last
+  beq _noBufferUpload
+    ;upload tiles (if any)  
+    lda.b animation.frame.tiles.length
+    beq +
+	  jsr _tileTransfer
+
++   ;upload palette (if any)  
+    lda.b animation.frame.palette.length
+    beq +
+	  jsr _paletteTransfer
+
++
+    lda.b animation.frame.tilemap.length
+    beq +
+	  jsr _tilemapTransfer
+
++
+    
+_noBufferUpload:
+;  jsr _writeOamBuffer
+
+  lda.b animation.frame.current
+  sta.b animation.frame.last
+
+  lda.b animation.isPlaying
+  and.w #$ff
+  beq _notPlaying
+
+	lda.b animation.speed
+	and.w #$ff
+	and.w FrameCounter
+	bne _notPlaying
+
+	  lda.b animation.frame.current
+	  ;inc a
+	  cmp.b animation.frame.max
+	  bcc ++
+
+		lda.b animation.isLooping
+		and.w #$ff 
+		beq +
+		lda.w #0
+		bra ++
+
++			sep #$20
+			stz.b animation.isPlaying
+			rep #$31
+			lda.b animation.frame.max
+			sta.b animation.frame.last
+
+++	sta.b animation.frame.current	
+    
+_notPlaying:
+  plp
+  rts
+
+/**
+* bind background object to physical hardware bg-layer
+*
+* @param a<int, 8bit>	hardware bg number(0-3)
+*/
+abstract.Background.makePhysical:
+  php
+  rep #$31
+  pha
+  pea 0
+
+  and.w #$ff
+  cmp.w #BG.LAYER.3 + 1
+  bcc +
+	pha
+    TRIGGER_ERROR E_BadBgLayer
+
++
+  asl a
+  tax
+  lda.w BGTilesVram12
+  and.l TILES.MASK.LUT,x
+  sta.b 1,s
+  lda.l TILES.SHIFT.LUT,x
+  tay
+
+  lda.b animation.tiles.start
+  xba
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  and.w #$f
+  
+- cpy.w #0
+  beq +
+	asl a
+	dey
+	bra -
+
++ ora.b 1,s
+  sta.w BGTilesVram12
+
+  ;calculate tilemap adress setting for corresponding register
+  lda.b 3,s
+  and.w #$ff
+  tax
+
+  lda.b animation.tilemap.length + 1
+  lsr a
+  lsr a
+  lsr a
+  and.w #%11
+  pha
+
+  lda.b animation.tilemap.start
+  xba
+  lsr a
+  and.w #$fc
+  ora.b 1,s
+  sep #$20
+  sta.w BG1TilemapVram,x
+  
+  lda.l BgBitflagLUT,x
+  ora.w MainScreen
+  sta.w MainScreen
+
+  rep #$31
+  txa
+  asl a
+  asl a
+  tax
+  lda.b dimension.position.x + 1
+;writes out of range here(x=8):
+  sta.w xScrollBG1,x
+  lda.b dimension.position.y + 1
+  dec a
+  sta.w yScrollBG1,x
+
+  plx
+  plx
+  plx
+  plp
+  rts
+
+
+
+/**
+*
+*/
+_paletteTransfer:
+  .accu 16
+  .index 16
+  tsx
+
+  lda.b animation.frame.pointer
+  clc
+  adc.w #ANIMATION.FRAME.DATA
+  clc
+  adc.b animation.frame.tiles.length
+  clc
+  adc.b animation.frame.tilemap.length
+  tay
+
+  sep #$20
+  lda #DMA_TRANSFER.CGRAM	;transfer type
+  pha
+  phy
+  lda.b animation.frame.pointer+2		;source bank
+  pha
+  rep #$31
+
+  pei (animation.palette.start)
+  pei (animation.frame.palette.length)
+
+  jsr core.dma.registerTransfer
+  txs
+  rts
+
+/**
+*
+*/
+_tileTransfer:
+  .accu 16
+  .index 16
+  tsx
+
+  lda.b animation.frame.pointer
+  clc
+  adc.w #ANIMATION.FRAME.DATA
+  tay
+
+  sep #$20
+  lda #DMA_TRANSFER.VRAM	;transfer type
+  pha
+  phy
+  lda.b animation.frame.pointer+2		;source bank
+  pha
+  rep #$31
+
+  pei (animation.tiles.start)
+  pei (animation.frame.tiles.length)
+
+  jsr core.dma.registerTransfer
+  txs
+  rts
+
+/**
+*
+*/
+_tilemapTransfer:
+  .accu 16
+  .index 16
+
+  ;y is pointer to sprite data
+  lda.w #ANIMATION.FRAME.DATA
+  clc
+  adc.b animation.frame.tiles.length
+  tay
+  clc
+  adc.b animation.frame.tilemap.length
+  pha
+
+  ldx.b animation.ramBuffer.start
+
+/*  cpx.w #GLOBAL.oamBuffer.end - GLOBAL.oamBuffer
+  bcs _oamBufferFull*/
+
+  ;loop over frame tiles, get tile config
+-   lda.b [animation.frame.pointer],y
+
+	xba
+	sep #$20
+	clc
+	adc.b animation.palette.startid
+	rep #$31
+	xba
+;vhopppcc
+	sta.w GLOBAL.wramBuffer.start,x
+	inx
+	inx
+	iny
+	iny
+
+	tya
+	cmp 1,s
+	bcc -
+
+  pla
+  jsr abstract.Background.uploadTilemap
+
+  rts
+
+abstract.Background.uploadTilemap:
+  php
+  rep #$31
+  tsx
+  lda.w #GLOBAL.wramBuffer.start
+  clc
+  adc.b animation.ramBuffer.start
+  tay
+
+  sep #$20
+  lda #DMA_TRANSFER.VRAM	;transfer type
+  pha
+  phy
+  ;wla dx is too fucking stupid to correctly calculate ramsection bank despite spitting out correct adress in symbol file!
+  ;lda.b #:GLOBAL.wramAllocationBlocks		;source bank
+  lda.b #RAM		;source bank
+
+  pha
+  rep #$31
+
+  pei (animation.tilemap.start)
+  pei (animation.frame.tilemap.length)
+
+  jsr core.dma.registerTransfer
+  txs
+  plp
+  rts
+
+/**
+*
+*/
+abstract.Background.deallocate:
+  php
+  sep #$20
+  lda.b animation.tiles.id
+  beq +
+	jsr core.vram.deallocate
+
++ lda.b animation.palette.id
+  beq +
+	jsr core.cgram.deallocate
+
++ lda.b animation.tilemap.id
+  beq +
+	jsr core.vram.deallocate
+
++ lda.b animation.ramBuffer.id
+  beq +
+	jsr core.wram.deallocate
++
+  plp
+  rts
+
+abstract.Background.allocateMemory:
+  php
+  rep #$31
+  ;allocate tile vram
+  ldy.w #0
+  lda.w #TILES.GRANULARITY
+  ldx.b animation.tiles.length
+  
+  jsr core.vram.allocate
+  bcs +
+	pei (animation.tiles.length)
+    TRIGGER_ERROR E_OutOfVram
+
+
++ stx.b animation.tiles.start
+  sep #$20
+  sta.b animation.tiles.id
+  rep #$31
+
+  ;allocate tilemap vram
+  ldy.w #0
+  lda.w #TILEMAP.GRANULARITY
+  ldx.b animation.tilemap.length
+  
+  jsr core.vram.allocate
+  bcs +
+	pei (animation.tilemap.length)
+    TRIGGER_ERROR E_OutOfVram
+
++ stx.b animation.tilemap.start
+  sep #$20
+  sta.b animation.tilemap.id
+  rep #$31
+
+  ;allocate wram buffer for tilemap upload
+  ldx.b animation.tilemap.length
+  stx.b animation.ramBuffer.length
+
+  jsr core.wram.allocate
+  bcs +
+	pei (animation.tilemap.length)
+    TRIGGER_ERROR E_OutOfWram
+
+
++ stx.b animation.ramBuffer.start
+  sep #$20
+  sta.b animation.ramBuffer.id
+  rep #$31
+
+
+/*
+  ;calculate tile transpose id
+  pha
+  jsr core.oam.getNametableBase
+  tya
+  sta 1,s
+  lda animation.tiles.start
+  sec
+  sbc 1,s
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+
+  sep #$20
+  sta animation.tiles.startid
+  xba
+  and.b #%1
+  sta animation.buffer.nametable
+  rep #$31
+  pla
+*/
+
+  lda.b animation.tiles.bpp
+  and.w #$ff
+  asl a
+  tax
+  lda.l PALETTE.GRANULARITY.LUT,x
+  ;lda.w #PALETTE.GRANULARITY.8BPP
+  ldy.w #PALETTE.START.BG
+  ldx.b animation.palette.length
+  beq ++
+
+    jsr core.cgram.allocate
+    bcs +
+      pei (animation.palette.length)
+      TRIGGER_ERROR E_OutOfCgram
+
+
++   stx.b animation.palette.start
+    sep #$20
+    sta.b animation.palette.id
+    rep #$31
+
+
+    lda animation.palette.start
+    lsr a ;divide by $20
+    lsr a
+    lsr a
+  ;  lsr a
+  ;  lsr a
+
+    sep #$20
+    and.b #BG.PALETTE.BITS
+    sta animation.palette.startid
+    rep #$31
+++
+  
+  plp
+  rts
+
+  CLASS abstract.Background
+
+.ends

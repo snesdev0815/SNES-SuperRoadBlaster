@@ -1,0 +1,439 @@
+/**
+* dma fifo manager.
+*
+* because vram transfers can only happen during vblank and we don't want any routine that uploads something to vram block the system until vblank occurs,
+* routines call this manager instead.
+* It queues requested dma transfers and then fires them all when vblank is entered(usually during nmi).
+* Routines can poll queue status (empty/not-empty), but can't see if any individual transfer has completed or not
+* Also, overloading the queue will result in excessive vblank times that reach into the active display period
+* maximum transfer length/frame: ???
+*
+* Note that in order to present a uniform interface, all input byte adresses and lengths are given in bytes, no matter if the transfer target uses byte or word adresses.
+* Size conversion is handled internally according to transfer target.
+* This means that routines registering vram or cgram transfers should NOT divide adresses by 2 prior to registering, but register the real byte target adress instead.
+*
+* queue{ (8 bytes each)
+*   2byte: target adress (msb set means "transfer active")
+*   1byte: target register
+*   3byte: source adress
+*   2byte: transfer length
+* }
+* 
+* queue pointer operation:
+*	-queue starts at 0, wraps around at 8
+*	-queue pointer is incremented only when executing transfers, not when registering transfers
+*	-after the last transfer has been executed, the queue pointer must point to the slot last occupied by that transfer.
+*	-new transfers always start looking at pointer for new slots, then increment. if whole list was searched without finding a free slot, transfer is aborted  
+*
+* routines:
+* core.dma.registerTransfer:
+*	-store dma transfer in queue, return true if ok, false if queue is full
+*	-in stack: 1 byte target reg, 3 byte source adress, 2 byte target adress, 2 byte transfer length
+* isQueueEmpty:
+*	-returns true if queue is empty
+* processDmaQueue:
+*	-forces vblank, then simply executes all requested transfers
+* 
+* sample call to register transfer:
+*   tsx
+*   lda #$12		;target register
+*   pha
+*   lda #$34		;source bank
+*   pea #$5678	;source adress
+*   pea #$9abc	;target adress
+*   pea #$55aa	;transfer length
+*   jsr core.dma.registerTransfer
+*   txs
+*/
+
+
+.include "src/core/dma.h"
+.section "dmaFifo"
+
+
+/**
+* just clearing all global vars to zero, must be called before any queue processing takes place
+*
+*/
+core.dma.init:
+  php
+  sep #$20
+  lda #0
+  ldy.w #DMA_QUEUE.GLOBAL.END - DMA_QUEUE.GLOBAL.START
+  ldx.w #DMA_QUEUE.GLOBAL.START
+  jsr ClearWRAM
+  
+  jsr core.dma_channel.allocate
+  sta.w GLOBAL.dmaQueueChannel.id
+  
+  rep #$31
+  and.w #$ff
+  tax
+  sep #$20  
+  lda.l dmaBitflagLut,x
+;  and.w #$ff
+  sta.w GLOBAL.dmaQueueChannel.flag
+
+  rep #$31
+  lda.w GLOBAL.dmaQueueChannel.id
+  and.w #$ff
+  asl a
+  asl a
+  asl a
+  asl a  
+  sta.w GLOBAL.dmaQueueChannel.index
+  
+  ldx.w #dmaQueue.IRQ
+  jsr core.irq.registerCallback
+  
+  plp
+  rts
+
+/**
+* call this from any context to register dma transfer
+*
+* @param stack int		push to stack in this order: 1 byte dma type(10,s), 3 byte source adress(9,s), 2 byte target adress(6,s), 2 byte transfer length(4,s)
+* @return carry bool	set if transfer was successfully registered
+*/
+core.dma.registerTransfer:
+  php
+  rep #$31
+  phx
+  ;jsr core.nmi.stop
+  sei
+  lda.w GLOBAL.currentDmaQueueSlot
+  and.w #(DMA_QUEUE_SLOTS * _sizeof_dmaQueue) - 1
+  tax
+  
+  ldy.w #DMA_QUEUE_SLOTS
+
+;seek free queue slot
+/*-	lda.w ((GLOBAL.dmaQueue.1.transferType - 1)&$ffff),x
+	bpl +*/
+-	lda.w GLOBAL.dmaQueue.1.transferType,x
+	bit.w #DMA_TRANSFER.OPTION.ACTIVE
+	beq +
+
+	txa
+	clc
+	adc.w #_sizeof_dmaQueue
+	and.w #(DMA_QUEUE_SLOTS * _sizeof_dmaQueue) - 1
+	tax
+	dey
+	bne -
+;return false if no free slot was found	
+      ;jsr core.nmi.start
+	  plx
+	  plp
+	  clc
+	  rts	
+
+;got free slot, x is pointer to slot
++ lda 13,s
+  and.w #(DMA_TRANSFER.OPTION.FIXED_SOURCE | DMA_TRANSFER.OPTION.ACTIVE | DMA_TRANSFER.OPTION.REVERSE) ~$ff
+  cmp.w #DMA_TRANSFER.MAX
+  bcc +
+	pha
+    TRIGGER_ERROR E_InvalidDmaTransferType
+
+
++ 
+  lda 13,s
+  ora.w #DMA_TRANSFER.OPTION.ACTIVE
+  sta.w GLOBAL.dmaQueue.1.transferType,x
+  lda 9,s
+  sta.w (GLOBAL.dmaQueue.1.sourceAdress & $ffff) + 1 ,x
+  lda 11,s
+  sta.w GLOBAL.dmaQueue.1.sourceAdress,x
+
+  lda 8,s
+  sta.w GLOBAL.dmaQueue.1.targetAdress,x
+  lda 6,s
+  bne +
+	;zero length transfer encountered, abort.
+	pha
+    TRIGGER_ERROR E_InvalidDmaTransferLength
+
+
++ sta.w GLOBAL.dmaQueue.1.transferLength,x  
+  ;jsr core.nmi.start
+  plx
+  plp
+  sec
+  rts
+
+
+/**
+* reports whether queue is empty, (i.e. all registered transfers have finished)
+*
+* @return carry bool	set if queue is empty
+*/
+core.dma.isQueueEmpty:
+  php
+  rep #$31
+  phx
+  lda.w GLOBAL.currentDmaQueueSlot
+  and.w #(DMA_QUEUE_SLOTS * _sizeof_dmaQueue) - 1
+  tax
+/*  lda.w ((GLOBAL.dmaQueue.1.transferType - 1)&$ffff),x
+  bmi +*/
+  lda.w GLOBAL.dmaQueue.1.transferType,x
+  bit.w #DMA_TRANSFER.OPTION.ACTIVE
+  bne +
+
+;queue is empty
+	plx
+	plp
+	sec
+	rts
+
+;queue is not empty
++ plx
+  plp
+  clc
+  rts
+
+
+/**
+* processes all queued transfers.
+* WARNING: vblank must be active/forced when calling this routine, else transfers won't go through if target is vram
+*
+*/
+core.dma.processQueue:
+  php
+  rep #$31
+  lda.w GLOBAL.currentDmaQueueSlot
+  and.w #(DMA_QUEUE_SLOTS * _sizeof_dmaQueue) - 1
+  tax
+dmaQueueLoop:
+	lda.w GLOBAL.dmaQueue.1.transferType,x
+	bit.w #DMA_TRANSFER.OPTION.ACTIVE
+	beq doneProcessingQueue
+
+	lda.w GLOBAL.dmaQueue.1.transferType,x
+	and.w #(DMA_TRANSFER.OPTION.FIXED_SOURCE | DMA_TRANSFER.OPTION.ACTIVE | DMA_TRANSFER.OPTION.REVERSE) ~$ff
+	cmp.w #DMA_TRANSFER.MAX
+	bcc +
+	  pha
+      TRIGGER_ERROR E_InvalidDmaTransferType
+
+
++	/*lda.w GLOBAL.dmaQueue.1.transferType,x
+	and.w #(DMA_TRANSFER.OPTION.FIXED_SOURCE | DMA_TRANSFER.OPTION.ACTIVE) ~$ff*/
+	asl a
+	phx
+	txy
+	tax
+	jsr (dmaQueueJumpTable,x)
+	plx
+
+  gotoNextQueueSlot:
+	stz.w GLOBAL.dmaQueue.1.transferType,x
+	stz.w GLOBAL.dmaQueue.1.transferLength,x
+	txa
+	clc
+	adc.w #_sizeof_dmaQueue
+	and.w #(DMA_QUEUE_SLOTS * _sizeof_dmaQueue) - 1
+	tax
+	bra dmaQueueLoop
+
+doneProcessingQueue:
+  stx.w GLOBAL.currentDmaQueueSlot
+  plp
+  rts
+
+dmaQueueVramTransfer:
+;  php
+;  rep #$31
+  ldx.w GLOBAL.dmaQueueChannel.index
+  
+  lda.w GLOBAL.dmaQueue.1.sourceAdress,y
+  sta.l DMASRC0L,x
+  lda.w (GLOBAL.dmaQueue.1.sourceAdress & $ffff) + 1 ,y
+  sta.l DMASRC0H,x
+
+  lda.w GLOBAL.dmaQueue.1.targetAdress,y
+  lsr a
+  sta.l VMADDL
+
+  lda.w GLOBAL.dmaQueue.1.transferLength,y
+  sta.l DMALEN0L,x
+
+  sep #$20
+  lda.b #VMAIN_INCREMENT_MODE
+  sta.l VMAIN
+
+  lda.b #DMAP_2_REG_WRITE_ONCE
+  jsr dmaQueueSetDmap0
+
+  lda.b #VMDATAL & $ff
+  sta.l DMADEST0,x
+
+  lda.w GLOBAL.dmaQueueChannel.flag
+  sta.l MDMAEN
+ 
+  rep #$31
+;  plp
+  rts
+
+
+dmaQueueOamTransfer:
+;  php
+;  rep #$31
+
+  ldx.w GLOBAL.dmaQueueChannel.index
+  
+  lda.w GLOBAL.dmaQueue.1.sourceAdress,y
+  sta.l DMASRC0L,x
+  lda.w (GLOBAL.dmaQueue.1.sourceAdress & $ffff) + 1 ,y
+  sta.l DMASRC0H,x
+
+  lda.w GLOBAL.dmaQueue.1.targetAdress,y
+  sta.l OAMADDL
+
+  lda.w GLOBAL.dmaQueue.1.transferLength,y
+  sta.l DMALEN0L,x
+
+  sep #$20
+  lda.b #DMAP_1_REG_WRITE_ONCE
+  jsr dmaQueueSetDmap0
+
+  lda.b #OAMDATA & $ff
+  sta.l DMADEST0,x
+
+  lda.w GLOBAL.dmaQueueChannel.flag
+  sta.l MDMAEN
+
+  rep #$31
+;  plp
+  rts
+
+dmaQueueCgramTransfer:
+;  php
+;  rep #$31
+
+  ldx.w GLOBAL.dmaQueueChannel.index
+
+  lda.w GLOBAL.dmaQueue.1.sourceAdress,y
+  sta.l DMASRC0L,x
+  lda.w (GLOBAL.dmaQueue.1.sourceAdress & $ffff) + 1 ,y
+  sta.l DMASRC0H,x
+
+  lda.w GLOBAL.dmaQueue.1.transferLength,y
+  sta.l DMALEN0L,x
+
+  lda.w GLOBAL.dmaQueue.1.targetAdress,y
+  lsr a
+  sep #$20
+  sta.l CGADD
+  
+  lda.b #DMAP_1_REG_WRITE_ONCE
+  jsr dmaQueueSetDmap0
+
+
+  lda.b #CGDATA & $ff
+  sta.l DMADEST0,x
+  
+  ;quick hack to enable dual direction transfers
+  lda.w GLOBAL.dmaQueue.1.transferType,y
+  bit.b #DMA_TRANSFER.OPTION.REVERSE
+  beq +
+    lda.b #CGDATAREAD & $ff
+    sta.l DMADEST0,x
+  
++  
+
+  lda.w GLOBAL.dmaQueueChannel.flag
+  sta.l MDMAEN
+
+  rep #$31
+;  plp
+  rts
+
+
+/**
+* set normal or fixed source transfer
+*/
+/*
+dmaQueueSetDmap0:
+  .ACCU 8
+  pha
+  lda.w GLOBAL.dmaQueue.1.transferType,y
+  bit.b #DMA_TRANSFER.OPTION.FIXED_SOURCE
+  bne dmaQueueSetDmap0Fixed
+
+  pla
+  sta.l DMAP0
+  rts
+
+dmaQueueSetDmap0Fixed:
+  pla
+  ora.b #DMAP_FIXED_TRANSFER
+  sta.l DMAP0
+  rts
+*/
+
+dmaQueueSetDmap0:
+  .ACCU 8
+  pha
+  lda.w GLOBAL.dmaQueue.1.transferType,y
+  bit.b #DMA_TRANSFER.OPTION.FIXED_SOURCE
+  beq +
+    lda 1,s
+    ora.b #DMAP_FIXED_TRANSFER
+    sta 1,s
+
++
+  lda.w GLOBAL.dmaQueue.1.transferType,y
+  bit.b #DMA_TRANSFER.OPTION.REVERSE
+  beq +
+    lda 1,s
+    ora.b #DMAP_TRANSFER_DIRECTION
+    sta 1,s
+
++ pla
+  sta.l DMAP0,x
+  rts
+
+/**
+ * Irq-callback routine
+ */  
+  IRQ dmaQueue IRQ.VPOS.PAL 0
+  php
+  sep #$20
+  ;hack to fix 1/1/1-chipset bug, stop all hdma channels before starting dma transfers
+  lda #0
+  sta.l HDMAEN
+
+  ;mask screen below irq
+  lda #(W12SEL_BG2_W1_ENABLE | W12SEL_BG1_W1_ENABLE)
+  sta.l W12SEL
+  ;sta.w window12Sel
+
+  lda #0
+  sta.l W1L
+
+  lda #255
+  sta.l W1R
+  
+  lda #(WOBJSEL_COL_W1_ENABLE | WOBJSEL_COL_W1_ENABLE)
+  sta.l WOBJSEL
+  ;sta.w windowObjSel
+  
+  
+  lda #(T_BG2_ENABLE | T_BG1_ENABLE)
+  sta.l TMW
+  ;sta.w windowMainscreen
+  
+  lda.b #INIDSP_FORCE_BLANK
+  sta.l INIDSP
+
+  jsr core.dma.processQueue
+
+  lda.w ScreenBrightness
+  ;and.b #INIDSP_FORCE_BLANK ~$ff
+  sta.l INIDSP
+  plp
+  rts
+
+.ends

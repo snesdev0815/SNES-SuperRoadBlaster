@@ -1,0 +1,25 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/unit_test/iterator_test.h"
+.section "iterator_test"
+
+/**
+* @param a<16bit>	iterator.properties this instance should have
+*/
+  METHOD setProperties
+  rep #$31
+  jsr abstract.Iterator.setProperties
+  sec
+  rts
+
+  METHOD badeaffe
+  rep #$31
+  lda.w #$bade
+  lda.w #$affe
+  rts
+
+  CLASS Iterator_test setProperties badeaffe
+.ends	
+	

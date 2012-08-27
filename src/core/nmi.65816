@@ -1,0 +1,252 @@
+;this nmi uses a maximum of 20 scanlines while streaming brr frames to the spc
+.include "src/core/nmi.h"
+;.include "routines/joypadread.asm"
+.section "nmi"
+
+core.nmi.play:
+	rep #$39
+	pha
+	phb
+	phd
+	phx
+	phy
+	lda.w #ZP
+	tcd
+
+	sep #$20
+	lda #RAM
+	pha
+	plb
+
+    lda.l RDNMI         ;reset nmi flag
+	lda #0
+	sta.l WRIO			;clear iobit
+
+    lda.w GLOBAL.HDMA.CHANNEL.ENABLE        ;check which hdma channels need to be activated
+    sta.l HDMAEN        ;set hdma channels and disable dma channel
+
+;	jsr core.nmi.stop
+
+	rep #$31
+	inc.w FrameCounter
+	lda.w window12Sel
+	sta.l W12SEL
+	lda.w window1Left
+	sta.l W1L
+	lda.w window2Left
+	sta.l W2L
+	lda.w windowBGLogic
+	sta.l WBGLOG
+	lda.w windowMainscreen
+	sta.l TMW
+
+    lda.w xScrollBG1
+    sta.w GLOBALS.BUFFER.scroll.bg1.x
+    lda.w yScrollBG1
+    sta.w GLOBALS.BUFFER.scroll.bg1.y
+
+
+	sep #$20
+	lda.w windowObjSel
+	sta.l WOBJSEL
+	lda.w mosaicSetting
+	sta.l MOSAIC
+
+	lda.w ScreenMode		;set screenmode and bg sizes
+	sta.l BGMODE
+    sta.w GLOBAL.BUFFER.screenMode
+	lda.w MainScreen		;setup main and subscreen
+	sta.l TMAIN
+    sta.w GLOBAL.BUFFER.mainScreen
+	lda.w SubScreen		;setup main and subscreen
+	sta.l TSUB
+    sta.w GLOBAL.BUFFER.subScreen
+	lda.w BGTilesVram12		;set offsets in vram for tiles
+	sta.l BG12NBA			;of bg1 and bg2
+    sta.w GLOBALS.BUFFER.bg12Tiles
+	lda.w BGTilesVram34		;set offsets in vram for tiles
+	sta.l BG34NBA			;of bg1 and bg2
+	lda.w BG1TilemapVram	;set offset of bg1 tilemap in  vram
+	sta.l BG1SC
+    sta.w GLOBALS.BUFFER.bg1Tilemap
+	lda.w BG2TilemapVram	;set offset of bg2 tilemap in  vram
+	sta.l BG2SC
+	lda.w BG3TilemapVram	;set offset of bg3 tilemap in  vram
+	sta.l BG3SC
+	lda.w BG4TilemapVram	;set offset of bg4 tilemap in  vram
+	sta.l BG4SC
+
+	lda.w colorAdditionSelect		;colour add/sub config
+	sta.l CGWSEL
+
+	lda.w CgadsubConfig
+	sta.l CGADSUB
+	lda.w FixedColourB
+	and #COLDATA_INTENSITY
+	ora #COLDATA_BLUE
+	sta.l COLDATA
+	lda.w FixedColourG
+	and #COLDATA_INTENSITY
+	ora #COLDATA_GREEN
+	sta.l COLDATA
+	lda.w FixedColourR
+	and #COLDATA_INTENSITY
+	ora #COLDATA_RED
+	sta.l COLDATA
+
+	lda.w xScrollBG1		;set bg1 h-offset
+	sta.l BG1HOFS
+	lda.w xScrollBG1&$ffff+1
+	sta.l BG1HOFS
+	lda.w yScrollBG1		;set bg1 v-offset
+	sta.l BG1VOFS
+	lda.w yScrollBG1&$ffff+1
+	sta.l BG1VOFS
+	lda.w xScrollBG2		;set bg2 h-offset
+	sta.l BG2HOFS
+	lda.w xScrollBG2&$ffff+1
+	sta.l BG2HOFS
+	lda.w yScrollBG2		;set bg2 v-offset
+	sta.l BG2VOFS
+	lda.w yScrollBG2&$ffff+1
+	sta.l BG2VOFS
+    lda.w xScrollBG3        ;set bg3 h-offset
+    sta.l BG3HOFS
+    lda.w xScrollBG3&$ffff+1
+    sta.l BG3HOFS
+    lda.w yScrollBG3        ;set bg3 v-offset
+    sta.l BG3VOFS
+    lda.w yScrollBG3&$ffff+1
+    sta.l BG3VOFS
+
+	lda.w ObjSel
+	sta.l OBJSEL
+
+	jsr core.input.refresh
+
+    ;update irq flags
+    lda.w GLOBAL.interruptFlags
+    sta.l NMITIMEN
+
+	;process dma queue, but force blank before doing so.
+;	sep #$20
+    
+/*
+	lda.b #INIDSP_FORCE_BLANK
+	sta.l INIDSP
+	jsr core.dma.processQueue
+
+	lda.w ScreenBrightness
+	and.b #INIDSP_FORCE_BLANK ~$ff
+	sta.l INIDSP
+*/
+	rep #$39
+/*
+    lda.l GLOBAL.irq.ypos
+    sta.l VTIMEL
+
+    lda.l GLOBAL.irq.xpos
+    sta.l HTIMEL
+*/
+;    jsr core.nmi.start
+
+	ply
+	plx
+	pld
+	plb
+	pla
+	rti				;return from nmi
+
+core.nmi.init:
+	php
+
+	sep #$20
+	lda #INIDSP_FORCE_BLANK			;enter forced blank
+	sta.l INIDSP
+	lda #0		;clear zero page
+	ldy #NmiGlobalVarsEnd-NmiGlobalVarsStrt
+	ldx #NmiGlobalVarsStrt
+
+	jsr ClearWRAM
+	jsr ClearVRAM
+
+    lda.w GLOBAL.interruptFlags
+	ora #NMITIMEN_NMI_ENABLE |	NMITIMEN_AUTO_JOY_READ	;enable screen and nmi, auto joypad
+	sta.w GLOBAL.interruptFlags
+
+	sta.l NMITIMEN
+	;lda.w SetIni			;set display mode
+    ;lda #SETINI_OVERSCAN
+    lda #0
+	sta.l SETINI			;dont set this during nmi cause if the overscan flag is changed mid-nmi, it might result in screw ups with the nmi timing
+
+	lda.l RDNMI	;pull up nmi line
+	lda.l TIMEUP	;pull up irq line
+
+	;lda #$ff
+	;sta.w ScreenBrightness
+	stz.w ScreenBrightness
+
+	plp
+	cli
+	rts
+
+NmiPlay:
+	rep #$31
+	lda.w #$beef
+	rts
+
+NmiKill:
+	sep #$20
+	sei
+	lda.w GLOBAL.interruptFlags
+	and #NMITIMEN_NMI_ENABLE ~$ff
+	sta.l NMITIMEN
+	rts
+
+/**
+* temporally prevent nmis from happening.
+* useful if working on transaction that could be corrupted by asynchronous writes.
+* reenable with core.nmi.start
+*/
+core.nmi.stop:
+  pha
+  php
+  sep #$20
+  lda.w GLOBAL.interruptFlags
+  and #NMITIMEN_NMI_ENABLE ~$ff
+  sta.l NMITIMEN
+
+  plp
+  pla
+  rts
+
+/**
+* reenable temporally stopped nmis
+*/
+core.nmi.start:
+  pha
+  php
+  sep #$20
+  lda.w GLOBAL.interruptFlags
+  sta.l NMITIMEN
+
+  plp
+  pla
+  rts
+
+/**
+* this is a hack and super dangerous! causes system to hang if nmis don't happen!!
+*/
+core.nmi.waitFrame:
+  php
+  rep #$31
+  lda.l FrameCounter
+-   cmp.l FrameCounter
+    beq -
+
+  plp
+  rts
+
+.ends
+

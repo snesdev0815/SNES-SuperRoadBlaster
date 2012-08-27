@@ -1,0 +1,163 @@
+
+	SCRIPT score_entry
+.ACCU 16
+.INDEX 16
+
+  .def objBackground3 hashPtr.1
+  .def objScoreText hashPtr.2
+  .def objFameBrightness hashPtr.3
+  .def objMsu1 hashPtr.4
+  .def objPlayer hashPtr.5
+  .def objNameEntry hashPtr.6
+  .def currentScore this._tmp
+  .def irq.buffer.x this._tmp + 2
+  .def irq.buffer.y this._tmp + 4
+
+
+  NEW Brightness.CLS.PTR objFameBrightness
+
+  lda #BRIGHTNESS.NONE
+  CALL Brightness.set.MTD objFameBrightness 
+
+  lda.w #OBJECT.PROPERTIES.isChapter
+  jsr abstract.Iterator.setProperties
+  jsr abstract.Iterator.killOthers
+
+  lda.w #OBJECT.PROPERTIES.isEvent
+  jsr abstract.Iterator.kill.byProperties
+
+  ;kill sprites if there are any left, especially HUD-singletons!
+  lda.w #OBJECT.PROPERTIES.isSprite
+  jsr abstract.Iterator.kill.byProperties
+
+  lda.w #OBJID.Msu1
+  jsr abstract.Iterator.kill.byId
+
+  NEW Msu1.audio.CLS.PTR objMsu1
+
+  lda.w #1
+  CALL Msu1.audio.playAudio.MTD objMsu1
+
+  sep #$20
+  lda.b #BGMODE_MODE_1 | BGMODE_PRIORITY_LAYER_3
+  sta.w ScreenMode
+  lda.w MainScreen
+  and.b #(T_BG1_ENABLE | T_BG2_ENABLE | T_BG3_ENABLE | T_BG4_ENABLE) ~$ff
+  sta.w MainScreen
+  rep #$31
+
+  NEW Background.textlayer.16x16.CLS.PTR objScoreText
+  NEW Background.generic.CLS.PTR objBackground3 BG.LAYER.0 BG.scoreentry.PTR
+
+
+  lda #OBJID.Score
+  ldx #sort.score.score
+  jsr abstract.Sort.byId
+
+  lda #T_scoreEntry.PTR
+  CALL Background.textlayer.16x16.print.MTD objScoreText
+
+  NEW Player.CLS.PTR objPlayer
+  NEW Player.nameInput.CLS.PTR objNameEntry
+
+
+  lda #BRIGHTNESS.FULL
+  CALL Brightness.fadeTo.MTD objFameBrightness 
+
+  jsr core.irq.position.get
+  stx irq.buffer.x
+  sty irq.buffer.y
+
+  ldy #213
+  jsr core.irq.position.set
+
+  jsr SavePC
+
+  lda.w FrameCounter
+  bit #%111
+  beq +
+    rts
++
+  ;pea currentScore
+  CALL Player.getScore.MTD objPlayer
+  pha
+
+  CALL Player.nameInput.getScreenBuffer.MTD objNameEntry
+  phy
+  phx
+  lda #T_scoreEntryName.PTR
+
+  CALL Background.textlayer.16x16.print.MTD objFameText
+  ;hack
+  ;jsr core.string.parse
+  pla
+  pla
+  pla
+
+  
+  CALL Background.textlayer.16x16.flush.MTD objFameText
+
+  ;wait until name has been entered
+  CALL Player.nameInput.getName.MTD objNameEntry
+  bcs +
+    rts
+
++
+  ;create new score record with current player score and entered name
+  ;score record name
+  phy
+  phx
+  ;score record score
+  CALL Player.getScore.MTD objPlayer
+  pha
+  NEW Score.CLS.PTR oopCreateNoPtr
+  pla
+  pla
+  pla
+
+  CALL Player.nameInput.kill.MTD objNameEntry
+
+  ;sort by highest score, then delete lowest of the bunch, but only if more scores than required
+  lda #OBJID.Score
+  ldx #sort.score.score
+  jsr abstract.Sort.byId
+
+--
+    jsr abstract.Iterator.reset
+-     lda #OBJID.Score
+      jsr abstract.Iterator.each.byId
+      bcs -
+
+    lda iterator.count
+    cmp #HIGHSCORE.COUNT+1
+    bcc +
+      CALL Score.kill.MTD iterator.target
+      bra -- ;try again until no more score objects than allowed are present
+
++
+  ;save all hightscore objects
+  lda.w #OBJECT.PROPERTIES.isSerializable
+  jsr core.persistency.save
+
+  lda #BRIGHTNESS.NONE
+  CALL Brightness.fadeTo.MTD objFameBrightness
+
+  jsr SavePC
+  CALL Brightness.isDone.MTD objFameBrightness
+
+  bcs +++
+    rts
++++
+
+  CALL Background.generic.kill.MTD objBackground3
+  CALL Background.textlayer.16x16.kill.MTD objScoreText
+  CALL Msu1.audio.kill.MTD objMsu1
+
+  ldx irq.buffer.x
+  ldy irq.buffer.y
+  jsr core.irq.position.set
+
+  NEW Script.CLS.PTR oopCreateNoPtr msu1
+  rts
+
+

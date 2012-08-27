@@ -1,0 +1,328 @@
+/**
+* msu 1 audio handler
+* 
+* useful if only msu1 audio required (doesnt allocate any memory)
+*/
+.include "src/object/msu1/msu1.audio.h"
+.section "msu1.audio"
+
+  METHOD init
+  sep #$20
+  jsr core.nmi.stop
+
+  jsr _isMsu1Present
+  bcs +
+    TRIGGER_ERROR E_Msu1NotPresent
+
++
+  jsr _stopAudioTrack
+  jsr core.nmi.start
+
+  stz.b this.audioPlaying
+
+  rts
+
+  METHOD play
+  jsr _checkTrackEnd
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr _stop
+
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+/**
+* mutes msu1 audio output if song is not playing anymore.
+* this isn't really part of msu1 spec, but sd2snes outputs static if end of track reached
+*/
+_checkTrackEnd:
+  php
+  sep #$20
+  lda.l MSU_STATUS
+  and.b #MSU_STATUS_AUDIO_PLAY
+  bne +
+	lda.b #MSU_VOLUME_MUTE
+	sta.l MSU_VOLUME
+	stz.b this.audioPlaying
+
++
+  plp
+  rts
+
+  METHOD stop
+  php
+  sep #$20
+ 
+  jsr _stopAudioTrack
+  plp
+  rts
+
+
+/**
+* returns carry set if msu1 hardware was found
+*
+* @return carry bool	set if ok
+*/
+_isMsu1Present:
+  php
+  rep #$31
+  sep #$20
+  ldx.w #0
+-	lda.l MSU_ID,x
+	cmp.l msu1HardwareIdentifier,x
+	bne _msu1Missing
+	inx
+	cpx #msu1HardwareIdentifier.end-msu1HardwareIdentifier
+	bne -
+  plp
+  sec
+  rts
+
+_msu1Missing:
+  plp
+  clc
+  rts
+
+/**
+* returns carry set if msu1 datafile contains correct signature ("S-MSU1" + matching game title)
+*
+* @return carry bool	set if ok
+*/
+_isMsu1FilePresent:
+  php
+  rep #$31
+  sep #$20
+  
+  tsx
+  pea MSU1_FILE.ID
+  pea MSU1_FILE.ID >> 16
+  jsr _msu1SetAdress
+  txs
+
+  ldx.w #0
+-	lda.l MSU_DATA
+	cmp.l msu1HardwareIdentifier,x
+	bne _msu1FileMissing
+	inx
+	cpx #msu1HardwareIdentifier.end-msu1HardwareIdentifier
+	bne -
+
+  tsx
+  pea MSU1_FILE.TITLE
+  pea MSU1_FILE.TITLE >> 16
+  jsr _msu1SetAdress
+  txs
+
+  ldx.w #0
+-	lda.l MSU_DATA
+	cmp.l SNESHEADER.TITLE,x
+	bne _msu1FileMissing
+	inx
+	cpx #MSU1_FILE.TITLE.LEN
+	bne -
+  plp
+  sec
+  rts
+
+_msu1FileMissing:
+  plp
+  clc
+  rts
+
+
+/**
+* seek to specified position in msu1 data file and wait for ack.
+* triggers exception if msu1 doesn't respond in time.
+*
+* @param stack int	32bit adress to seek to
+*/
+_msu1SetAdress:
+  php
+  rep #$31
+  phx
+  lda 8,s
+  sta.l MSU_ADRESS
+  lda 6,s
+  sta.l MSU_ADRESS+2
+
+  sep #$20
+  ldx.w #MSU1_SEEK_TIMEOUT
+-	dex
+	beq _msu1SetAdressTimeout
+	lda.l MSU_STATUS
+	bmi -
+  plx
+  plp
+  rts
+
+
+_msu1SetAdressTimeout:
+  TRIGGER_ERROR E_Msu1SeekTimeout
+
+
+/**
+* stops audio track, trigger error if hardware is not responding.
+*
+*/
+_stopAudioTrack:
+  php
+  rep #$31
+  sep #$20
+  stz.b this.audioPlaying
+
+  ;set volume
+  lda.b #MSU_VOLUME_MUTE
+  sta.l MSU_VOLUME
+
+  ;stop track
+  lda.b #0
+  sta.l MSU_TRACK	;necessary because audio busy flag is set by default(for whatever reason)
+  sta.l MSU_TRACK+1
+  sta.l MSU_CONTROL
+  jsr _waitAudioBusy
+
+  /* @todo
+  ;check if msu1 actually stopped playing
+  lda.l MSU_STATUS
+  and.b #MSU_STATUS_AUDIO_PLAY
+  bne _msu1playAudioError
+  */
+
+
+  plp
+  rts
+
+
+/**
+* play audio track, trigger error if track is non-existant/hardware is not responding. Stops any playing track
+*
+* @param a int,8bit	track to play
+*/
+  METHOD playAudio
+  php
+  rep #$31
+  sep #$20
+  sta.b this.currentTrack
+
+  jsr _stopAudioTrack
+
+  lda.b #TRUE
+  sta.b this.audioPlaying
+
+  ;set volume
+  lda.b #MSU_VOLUME_FULL
+  sta.l MSU_VOLUME
+
+  ;set track
+  lda.b this.currentTrack
+  sta.l MSU_TRACK
+  lda.b #0
+  sta.l MSU_TRACK+1
+  jsr _waitAudioBusy
+
+  ;start playing track
+  lda.b #MSU_CONTROL_PLAY
+  sta.l MSU_CONTROL
+  jsr _waitAudioBusy
+
+  ;check if error occured while seeking to audio track
+  lda.l MSU_STATUS
+  and.b #MSU_STATUS_AUDIO_ERROR
+  bne _msu1playAudioError
+
+  plp
+  rts
+
+_msu1playAudioTimeout:
+  pei (this.currentTrack)
+  TRIGGER_ERROR E_Msu1AudioSeekTimeout
+
+  plp
+  rts
+
+_msu1playAudioError:
+  pei (this.currentTrack)
+  TRIGGER_ERROR E_Msu1AudioPlayError
+
+  plp
+  rts
+
+_waitAudioBusy:
+  php
+  rep #$31
+  sep #$20
+  ldx.w #MSU1_SEEK_TIMEOUT
+
+-	dex
+;	beq _msu1playAudioTimeout
+	lda.l MSU_STATUS
+	and.b #MSU_STATUS_AUDIO_BUSY
+	bne -
+
+  plp
+  rts
+
+
+/**
+* pause video playback
+*/
+  METHOD pause
+  php
+  sep #$20
+  stz.b this.audioPlaying
+
+  ;mute audio
+  lda.b #MSU_VOLUME_MUTE
+  sta.l MSU_VOLUME
+
+  ;pause audio
+  lda.b #0
+  sta.l MSU_CONTROL
+
+  plp
+  rts
+
+/**
+* pause video playback
+*/
+  METHOD resume
+  php
+  sep #$20
+  lda.b #TRUE
+  sta.b this.audioPlaying
+
+  ;turn up volume
+  lda.b #MSU_VOLUME_FULL
+  sta.l MSU_VOLUME
+
+  ;unpause audio
+  lda.b #MSU_CONTROL_PLAY
+  sta.l MSU_CONTROL
+
+  plp
+  rts
+
+/**
+* @return c <bool>	true if done playing track
+*/
+  METHOD isDone
+  php
+  sep #$20
+  lda this.audioPlaying
+  bne +
+	plp
+	sec
+	rts
+
++
+  plp
+  clc
+  rts
+
+
+  CLASS Msu1.audio playAudio stop pause resume isDone
+.ends	
+	

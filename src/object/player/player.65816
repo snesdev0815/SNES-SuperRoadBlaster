@@ -1,0 +1,90 @@
+/**
+* player data container, holds score, lifes etc.
+*/
+.include "src/object/player/player.h"
+.section "player"
+
+  /**
+  *
+  */
+  METHOD init
+  sep #$20
+  lda.b #PLAYER.LIFES.DEFAULT
+  sta.b this.lifes
+  rep #$31
+  stz.b this.score
+  rts
+
+  /**
+  * add points to score
+  *
+  * @param a <int, 16bit>	amount of points to add
+  */
+  METHOD addToScore
+  rep #$31
+  adc this.score
+  cmp #9999
+  bcc +
+	lda #9999
++ sta this.score
+  rts
+
+  /**
+  * get current score
+  *
+  */
+  METHOD getScore
+  php
+  rep #$31
+  lda this.score
+  plp
+  rts
+
+  /**
+  * get current name
+  *
+  */
+  METHOD getName
+  php
+  rep #$31
+  lda this.name
+  ldx this.name+2
+  plp
+  rts
+
+  /**
+  * get current amount of lifes
+  *
+  */
+  METHOD getLifeCount
+  php
+  rep #$31
+  lda this.lifes
+  and.w #$ff
+  plp
+  rts
+
+  /**
+  * player dies, loses a life
+  *
+  * @return c <bool>	true if game over
+  */
+  METHOD loseLife
+  sep #$20
+  lda this.lifes
+  bne +
+    ;jsr _reset
+	sec
+	rts
+
++ dec this.lifes
+  clc
+  rts
+
+  METHOD reset
+  jsr _init
+  rts
+
+  CLASS Player getScore getName getLifeCount addToScore loseLife reset
+.ends	
+	

@@ -1,0 +1,16 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/event/Event.show_help.h"
+.section "Event.show_help"
+
+  ;debug, kill immediately
+  METHOD play
+  rep #$31
+  CALL Event.show_help.kill.MTD iterator.self
+  rts
+
+  CLASS Event.show_help
+.ends	
+	

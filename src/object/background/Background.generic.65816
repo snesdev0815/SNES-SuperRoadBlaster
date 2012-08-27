@@ -1,0 +1,51 @@
+/**
+* right arrow sprite
+* 
+* @param 1<int, 8bit>  bg-layer id
+* @param 2<int, 16bit>  animation id
+*/
+.include "src/object/background/Background.generic.h"
+.section "Background.generic"
+
+  METHOD init
+  sep #$20
+  lda OBJECT.CALL.ARG.1,s
+  sta.b this.bg
+
+  rep #$31
+  
+  lda OBJECT.CALL.ARG.2,s
+  and.w #$ff
+  jsr abstract.Background.startAnimation
+  jsr abstract.Background.allocateMemory
+  
+  lda.b this.bg
+  jsr abstract.Background.makePhysical
+
+  rts
+
+  METHOD play
+  jsr abstract.Background.playAnimation
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr abstract.Background.deallocate
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+  METHOD getAllocatedPalette
+  ldx.b animation.palette.start
+  ldy.b animation.palette.length
+  lda.b animation.palette.id
+  and.w #$ff
+  clc
+  beq +
+    sec
+
++ rts
+  
+  CLASS Background.generic getAllocatedPalette
+.ends	
+	

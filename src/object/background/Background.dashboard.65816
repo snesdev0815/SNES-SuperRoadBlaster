@@ -1,0 +1,278 @@
+/**
+* dashboard background
+* 
+* @param 1<int, 8bit>  bg-layer id
+* @param 2<int, 16bit>  animation id
+*/
+.include "src/object/background/Background.dashboard.h"
+.section "Background.dashboard"
+
+  METHOD init
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  sta.b dimension.position.x + 1
+
+  lda OBJECT.CALL.ARG.2,s
+  sta.b dimension.position.y + 1
+  
+  sep #$20
+  lda #BG.LAYER.0
+  sta.b this.bg
+
+  lda #BGMODE_MODE_3
+  sta.l GLOBAL.dashboard.mode
+
+  lda.l MainScreen
+  and #T_BG2_ENABLE ~$ff
+  ora #T_BG1_ENABLE
+  sta.l GLOBAL.dashboard.mainScreen
+  lda #0
+  sta.l GLOBAL.dashboard.subScreen
+  
+  rep #$31
+  /*
+  lda #DASHBOARD.IRQ.X
+  sta this.irq.x
+  lda #DASHBOARD.IRQ.Y
+  sta this.irq.y
+
+  lda #-1
+  sta dimension.position.y + 1
+  */
+  
+  lda #BG.hud.PTR
+  jsr abstract.Background.startAnimation
+
+  stz.b animation.palette.length
+  jsr abstract.Background.allocateMemory
+
+  lda.b animation.tiles.start
+  xba
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  lsr a
+  and.w #$f
+  
+  ;sta.l GLOBAL.irq.buffer
+  sta.l GLOBAL.dashboard.tiles
+  
+  lda.b animation.tilemap.length + 1
+  lsr a
+  lsr a
+  lsr a
+  and.w #%11
+  pha
+
+  lda.b animation.tilemap.start
+  xba
+  lsr a
+  and.w #$fc
+  ;ora.b 1,s    ;quick hack, always have 32x32 map
+  ;sta.l GLOBAL.irq.buffer + 1
+  
+  sta.l GLOBAL.dashboard.tileMap
+  pla
+  
+  /*
+  lda dimension.position.x + 1
+  sta.l GLOBAL.dashboard.position.x
+  lda dimension.position.y + 1
+  sta.l GLOBAL.dashboard.position.y
+  */
+  jsr _setDashPosition
+  
+  jsr _getDashDisplacement
+  NEW Hdma.dashboard.mode.CLS.PTR this.hdma.mode
+
+  rts
+
+  METHOD play
+  rep #$31
+  jsr abstract.Background.playAnimation
+  rts
+  
+_getDashDisplacement:
+  php
+  rep #$31
+  lda dimension.position.y + 1
+  ;eor.w #$ffff
+  ;inc a
+  ;lda.w #164-33
+  plp
+  rts
+  
+_setDashPosition:
+  php
+  rep #$31
+  lda dimension.position.x + 1
+  eor.w #$ffff
+  inc a
+  sta.l GLOBAL.dashboard.position.x
+  
+  lda dimension.position.y + 1
+  eor.w #$ffff
+  inc a  
+  sta.l GLOBAL.dashboard.position.y
+  plp
+  rts
+/*
+_getDashDisplacement:
+  php
+  lda.l GLOBAL.dashboard.position.y
+  and.w #$ff
+  clc
+  adc #DASHBOARD.DISPLACEMENT.Y
+;  xba 
+;  and.w #$ff
+;  clc
+;  adc #DASHBOARD.DISPLACEMENT.Y
+  and.w #$ff  
+  plp
+  rts
+
+_updateIrqData:
+  php
+  rep #$31
+  ;update bg position for irq
+  lda dimension.position.y + 1
+  sta.l GLOBAL.irq.buffer + 2  
+  
+
+  lda dimension.position.x + 1
+  sta.l GLOBAL.irq.buffer + 4
+  
+  ;ldx this.irq.x
+  ;ldy this.irq.y
+  ;jsr core.irq.start
+
+  plp
+  rts
+*/  
+  METHOD kill
+  rep #$31
+  ;jsr core.irq.stop
+  
+  jsr abstract.Background.deallocate
+  CALL Hdma.dashboard.mode.kill.MTD this.hdma.mode  
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+  
+  METHOD translate
+/*
+;  jsr interface.dimension.translate    ;doesnt work, reads from wrong stack position
+  rep #$31
+  lda OBJECT.CALL.ARG.2,s
+
+  adc.b dimension.position.y
+  sta.b dimension.position.y
+
+  lda OBJECT.CALL.ARG.1,s
+  clc
+  adc.b dimension.position.x
+  sta.b dimension.position.x
+
+  ;move vertical irq position aswell
+  ;lda OBJECT.CALL.ARG.2,s
+  ;jsr _translateIrq
+
+  ;jsr _updateIrqData
+*/
+  
+  rep #$31
+  lda OBJECT.CALL.ARG.2,s
+  beq ++
+  
+  adc.b dimension.position.y
+  sta.b dimension.position.y
+
+  bcc +
+    lda OBJECT.CALL.ARG.2,s
+    bmi ++
+      sep #$20
+      inc.b dimension.position.y + 2
+      bra ++
++
+    lda OBJECT.CALL.ARG.2,s
+    bpl ++
+      sep #$20
+      dec.b dimension.position.y + 2
+
+++
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  beq ++
+  
+  adc.b dimension.position.x
+  sta.b dimension.position.x
+  lda.b dimension.position.x + 2
+
+  bcc +
+    lda OBJECT.CALL.ARG.1,s
+    bmi ++
+      sep #$20
+      inc.b dimension.position.x + 2
+      bra ++
++
+    lda OBJECT.CALL.ARG.1,s
+    bpl ++
+      sep #$20
+      dec.b dimension.position.x + 2
+
+++
+  rep #$31
+  jsr _setDashPosition
+  /*
+  lda dimension.position.x + 1
+  sta.l GLOBAL.dashboard.position.x
+  lda dimension.position.y + 1
+  sta.l GLOBAL.dashboard.position.y
+  */
+/*  xba
+  and.w #$ff
+  clc
+  adc #DASHBOARD.DISPLACEMENT.Y */
+
+  ;only recalculate hdma tables if threshold exceeded (hide/show dash)
+  lda OBJECT.CALL.ARG.2,s
+  bpl +
+    eor.w #$ffff
+    inc a
++ 
+  cmp #$1000
+  bcc +
+    jsr _getDashDisplacement
+    CALL Hdma.dashboard.mode.setYPosition.MTD this.hdma.mode
++
+  rts
+  
+  /**
+  * 
+  */
+  /*
+_translateIrq:
+  bpl +
+    xba
+    and.w #$ff
+    eor.w #$ff
+    inc a
+    pha
+    lda.b this.irq.y
+    sec
+    sbc 1,s
+    sta.b this.irq.y
+    pla
+    rts
+    
++ xba
+  and.w #$ff
+  clc
+  adc.b this.irq.y
+  sta.b this.irq.y
+  rts
+  */
+  CLASS Background.dashboard
+.ends	
+	

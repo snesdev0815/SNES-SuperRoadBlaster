@@ -1,0 +1,24 @@
+<chapter name="logo_intro">
+	<timeline>
+		<timestart min="00" second="00" ms="000"/>	
+		<timeend min="00" second="14" ms="863"/>
+	</timeline>
+	<params>
+		<str key="controller" value="chapter"/>
+		<int key="cockpit" value="0"/>
+	</params>	
+	<events>
+		<event type="confirm">
+			<timeline>
+				<timestart min="00" second="00" ms="000"/>	
+				<timeend min="00" second="14" ms="863"/>
+			</timeline>
+			<result value="1">
+				<playchapter name="title_screen"/>
+			</result>
+		</event> 	
+	</events>
+	<result>
+		<playchapter name="intro"/>	
+	</result>	
+</chapter>

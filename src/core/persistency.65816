@@ -1,0 +1,441 @@
+/**
+* persistency-handler, de/serializes objects from/to sram
+*/
+.include "src/core/persistency.h"
+.section "persistency"
+
+core.persistency.init:
+  php
+  rep #$31
+  sep #$20
+  lda.b #0        ;clear zero page
+  ldy.w #zpLen
+  ldx.w #core.persistency.zp.start
+  jsr ClearWRAM
+  plp
+  rts
+
+_loadBad:
+  ;if loading failed at any point, delete every serialized object created so far so that no stray objects lie around
+  rep #$31
+  ;lda.w #OBJECT.PROPERTIES.isSerializable
+  lda this.target.properties
+  jsr abstract.Iterator.kill.byProperties
+
+  pld
+  plp
+  clc
+  rts
+  
+/**
+* reloads all objects from sram, after deleting all serializable objects on object stack
+* 
+* @param a<1nt,16bit>   Properties of objects to load from sram
+* 
+* @return c<bool>   True if load successful.
+*/
+  
+core.persistency.load:
+  php
+  phd
+  pea core.persistency.zp.start
+  pld
+
+  ;first, kill all present serializable objects so that no object is there twice  
+  rep #$31
+  sta this.target.properties
+  ;lda.w #OBJECT.PROPERTIES.isSerializable
+  lda this.target.properties
+  jsr abstract.Iterator.kill.byProperties
+  
+  ;initialize pointer
+  sep #$20
+  lda #(SRAM.BASE >> 16)
+  sta this.sram.pointer + 2
+  
+  rep #$31
+  lda #SRAM.BASE & $ffff
+  sta this.sram.pointer
+  
+  ;check preamble
+  ldy #SRAM.SIGNATURE
+  lda [this.sram.pointer],y
+  cmp #SRAM.SIGNATURE.VALUE
+  bne _loadBad
+
+  ;check postscript
+  ldy #SRAM.LENGTH
+  lda [this.sram.pointer],y
+  sta this.sram.length
+  dec a
+  dec a
+  tay
+  lda [this.sram.pointer],y
+  cmp #SRAM.SIGNATURE.POST.VALUE
+  bne _loadBad
+  
+  ;check checksum xor
+  sep #$20
+  ldy #SRAM.CHSUM
+  lda [this.sram.pointer],y
+  iny
+  eor #$ff
+  cmp [this.sram.pointer],y
+  bne _loadBad
+  
+  ;calculate checksum
+  stz this.checksum
+  ldx this.sram.length
+  ldy #SRAM.SIGNATURE
+-  
+    lda [this.sram.pointer],y
+    clc
+    adc this.checksum
+    sta this.checksum
+    iny
+    dex
+    bne -
+    
+  ldy #SRAM.CHSUM
+  cmp [this.sram.pointer],y
+  bne _loadBad
+
+  ;load objects
+
+  ldy #SRAM.SLOTS
+-
+    rep #$31
+    ;check for load end
+    tya
+    inc a   ;account for postscript byte
+    inc a
+    cmp this.sram.length
+    bcs +
+    
+    lda [this.sram.pointer],y
+    cmp #SRAM.SLOT.SIGNATURE.VALUE
+    bne _loadBad
+    
+    iny
+    iny
+    sep #$20
+    lda [this.sram.pointer],y
+    cmp #MAXOBJID
+    bcc ++ 
+      jmp _loadBad
+      
+++
+    sta this.object.id
+    jsr _fetchObjectZpLength
+    iny
+    cmp [this.sram.pointer],y
+    beq ++
+      jmp _loadBad
+      
+++
+    stz this.object.length + 1
+    sta this.object.length
+
+    iny    
+    ;create object
+    rep #$31
+    lda this.object.id
+    and #$ff
+    phy
+    tay
+    ldx #iterator.target
+    jsr core.object.create
+    ply
+
+    ;fetch pointer to dp-ram
+    ldx.b iterator.target + 2
+    lda.l OopStack.dp,x
+    tax
+    sep #$20
+
+    ;overwrite object zero page with data from sram
+--
+
+      lda [this.sram.pointer],y
+      sta.w $0,x
+      inx
+      iny
+      dec this.object.length
+      bne --
+    
+
+    bra -
+
++  
+  /*sep #$20
+  
+  jsr abstract.Iterator.reset*/
+
+_loadOk:
+  pld
+  plp
+  sec
+  rts
+
+  
+_writeChecksumByte:
+.ACCU 8
+.INDEX 16
+  phy
+  ldy #0
+  sta [this.sram.pointer],y
+  cmp [this.sram.pointer],y
+  bne _writeError
+  
+  clc
+  adc this.checksum
+  sta this.checksum
+  
+  php
+  rep #$30
+  inc this.sram.pointer
+  inc this.sram.length
+  plp
+  
+  ply
+  rts
+
+_writeLength:
+.ACCU 8
+.INDEX 16
+  phy
+  ldy #0
+  sta [this.sram.pointer],y
+  cmp [this.sram.pointer],y
+  bne _writeError
+  
+  clc
+  adc this.checksum
+  sta this.checksum
+  
+  php
+  rep #$30
+  inc this.sram.pointer
+  plp
+  
+  ply
+  rts  
+  
+_writeWord:
+.ACCU 16
+.INDEX 16
+  sta [this.sram.pointer],y
+  cmp [this.sram.pointer],y
+  bne _writeError
+  rts
+
+_writeError:
+  lda [this.sram.pointer],y
+  pei (this.sram.pointer + 2)
+  pei (this.sram.pointer)
+  TRIGGER_ERROR E_SramBad
+  stp
+
+  
+_fetchObjectZpLength:
+    php
+    rep #$31
+    phx
+    phy
+    and #$ff
+    sta this.class.pointer
+    asl a
+    clc
+    adc this.class.pointer
+    tax
+    lda.l OopClassLut,x
+    sta this.class.pointer
+    lda.l OopClassLut+1,x
+    sta this.class.pointer+1
+    
+    ldy #OOPR.zpLen
+    lda [this.class.pointer],y
+    and #$ff
+    ply
+    plx
+    plp
+    rts
+    
+/**
+* saves all current serializable objects to sram, overwriting any that were present in sram
+* 
+* @param a<1nt,16bit>   Properties of objects to save from object stack to sram
+*/
+core.persistency.save
+
+  php
+  phd
+  pea core.persistency.zp.start
+  pld  
+
+  rep #$31
+  sta this.target.properties
+
+  ;initialize pointer
+  sep #$20
+  lda #(SRAM.BASE >> 16)
+  sta this.sram.pointer + 2
+  
+  rep #$31
+  lda #SRAM.BASE & $ffff
+  sta this.sram.pointer
+  
+  stz this.checksum
+  stz this.sram.length
+  
+  ldy #SRAM.SIGNATURE
+  lda #SRAM.TEST.VALUE.0
+  jsr _writeWord
+
+  lda #SRAM.TEST.VALUE.1
+  jsr _writeWord
+
+  sep #$20
+  ;write signature preamble
+  lda #SRAM.SIGNATURE.VALUE & $ff
+  jsr _writeChecksumByte
+  lda #(SRAM.SIGNATURE.VALUE >> 8) & $ff
+  jsr _writeChecksumByte
+
+  ;write length dummy
+  lda #0
+  jsr _writeChecksumByte
+  lda #0
+  jsr _writeChecksumByte
+  
+  ;write chsum dummy
+  lda #$0
+  jsr _writeChecksumByte
+  lda #$ff
+  jsr _writeChecksumByte
+  
+  ;ldy #SRAM.SIGNATURE
+
+  jsr abstract.Iterator.reset
+-   rep #$31
+    ;lda.w #OBJECT.PROPERTIES.isSerializable
+    lda this.target.properties
+    jsr abstract.Iterator.each.byProperties
+    sep #$20
+    bcc ++
+    
+    lda #SRAM.SLOT.SIGNATURE.VALUE & $ff
+    jsr _writeChecksumByte
+    lda #(SRAM.SLOT.SIGNATURE.VALUE >> 8) & $ff
+    jsr _writeChecksumByte    
+    
+    ;store object id
+    ldx.b iterator.target + 2
+    lda.l OopStack.id,x
+    sta this.object.id
+    cmp #MAXOBJID
+    bcc +
+      TRIGGER_ERROR E_ObjBadHash
++    
+    jsr _writeChecksumByte
+
+    ;store object zero page length
+    lda this.object.id
+    jsr _fetchObjectZpLength    
+    sta this.object.length
+    stz this.object.length + 1
+    jsr _writeChecksumByte
+    
+    ;skip writing zero page if it's empty
+    lda this.object.length
+    beq -
+    
+    ;fetch object zero page pointer
+    ;ldx.b iterator.target + 2
+    rep #$31
+    lda.l OopStack.dp,x
+    tay
+    sep #$20
+    ldx #0
+      
+--
+      ;write object zero page to sram
+      lda.w 0,y
+      jsr _writeChecksumByte
+      
+      iny
+      inx
+      cpx this.object.length
+      bne --
+
+    bra -
+++
+  ;write signature post
+  lda #SRAM.SIGNATURE.POST.VALUE & $ff
+  jsr _writeChecksumByte
+  lda #(SRAM.SIGNATURE.POST.VALUE >> 8) & $ff
+  jsr _writeChecksumByte
+
+  ;write total length
+  lda #(SRAM.BASE >> 16)
+  sta this.sram.pointer + 2
+  rep #$31
+  lda #(SRAM.BASE & $ffff) + SRAM.LENGTH
+  sta this.sram.pointer  
+  sep #$20
+
+  lda this.sram.length
+  jsr _writeLength
+  lda this.sram.length + 1
+  jsr _writeLength
+  
+  ;write checksum
+  lda #(SRAM.BASE >> 16)
+  sta this.sram.pointer + 2
+  rep #$31
+  lda #SRAM.BASE & $ffff
+  sta this.sram.pointer
+  sep #$20
+  ldy #SRAM.CHSUM
+  
+  lda this.checksum
+  eor #$ff
+  xba
+  lda this.checksum
+  rep #$31
+  jsr _writeWord
+
+  pld
+  plp
+  rts
+
+  
+/*
+ * getting object id from hash:
+        lda.l OopStack.id,x
+        sta.b iterator.target
+        lda.l OopStack.num,x
+        sta.b iterator.target + 1
+        txa
+        sta.b iterator.target + 2
+*/
+
+/* getting variables from object
+  * @param x <int, 16bit>    ;pointer to object in object stack, usually fetched from object hash
+ * @return a <int, 16bit>   ;word value of key variable
+
+_getKeyValue:
+  .accu 16
+  .index 16
+  lda.l OopStack.dp,x
+  clc
+  adc.b iterator.sort.key   ;no boundary checking here! If variable key adress is > objects zp-page, this might spill over into other objects!
+  tay
+  lda.w 0,y ;get 16bit key
+  rts
+ 
+ 
+ */  
+  
+.ends	
+	

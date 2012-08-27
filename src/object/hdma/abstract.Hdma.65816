@@ -1,0 +1,279 @@
+/**
+* abstract Sprite methods
+*
+*/
+
+
+.include "src/object/hdma/abstract.Hdma.h"
+.section "abstract.Hdma"
+
+  METHOD init
+  METHOD play
+  METHOD kill
+  rep #$31
+  TRIGGER_ERROR E_abstractClass
+  rts
+
+/**
+* enable hdma with current settings, allocate channel if required
+*
+* @return c<bool>	true if init ok. fails if no more hdma channels left
+*/
+abstract.Hdma.start:
+  php
+  sep #$20
+  lda hdma.channel
+  bit #HDMA.CHANNEL.ALLOCATED
+  bne ++
+	jsr core.dma_channel.allocate
+	bcs +
+	  ;unable to allocate channel, fail & return
+	  plp
+	  clc
+	  rts
+
++	ora #HDMA.CHANNEL.ALLOCATED
+	sta hdma.channel
+++
+  lda #TRUE
+  sta hdma.isActive
+  jsr abstract.Hdma.makePhysical
+
+  plp
+  sec
+  rts
+
+/**
+* disable hdma, deallocate channel
+*/
+abstract.Hdma.stop:
+  php
+  sep #$20
+  stz hdma.isActive
+  jsr abstract.Hdma.makePhysical
+
+  lda hdma.channel
+  and.b #HDMA.CHANNEL.ALLOCATED ~$ff
+  jsr core.dma_channel.deallocate
+
+  plp
+  rts
+
+/**
+* set adress of current hdma source table
+*
+* @param a <int, 8bit>	table bank
+* @param x <int, 16bit>	table adress
+*/
+abstract.Hdma.setTableAdress:
+  php
+  rep #$31
+  sep #$20
+  stx.b hdma.table.adress
+  sta.b hdma.table.adress + 2
+  plp
+  rts
+
+
+/**
+* write hdma channel settings to hardware registers
+*/
+abstract.Hdma.makePhysical:
+  php
+  rep #$31
+
+  lda hdma.isActive
+  and.w #$ff
+  bne +
+	;disable hardware hdma channel
+	jsr _getChannelBitflag
+	sep #$20
+	eor.b #$ff
+	and.w GLOBAL.HDMA.CHANNEL.ENABLE
+	sta.w GLOBAL.HDMA.CHANNEL.ENABLE
+
+    ;make sure canceled hdma transfers end immediately because the ram space where the corresponding hdma table lies might get deallocated and overwritten immediately
+    ;hopefully this doesnt break anything...
+    ;sta.l HDMAEN
+	plp
+	rts
+
++
+  jsr _getChannelRegisterBase
+
+  lda hdma.table.adress
+  sta.l DMASRC0L,x
+  ;sta.l DMALEN0L,x
+
+  lda hdma.table.adress + 1
+  sta.l DMASRC0H,x
+  ;sta.l DMALEN0H,x
+
+  sep #$20
+  lda hdma.flags
+  sta.l DMAP0,x
+
+  lda hdma.target
+  sta.l DMADEST0,x
+
+  lda hdma.indirect.bank
+  sta.l DMALEN0B,x
+
+  jsr _getChannelBitflag
+
+  ora.w GLOBAL.HDMA.CHANNEL.ENABLE
+  sta.w GLOBAL.HDMA.CHANNEL.ENABLE
+
+  plp
+  rts
+
+
+_getChannelBitflag:
+  php
+  rep #$31
+  lda hdma.channel
+  and.w #HDMA.CHANNEL.ALLOCATED ~$ff
+  tax
+  lda.l dmaBitflagLut,x
+  and.w #$ff
+  plp
+  rts
+
+_getChannelRegisterBase:
+  php
+  rep #$31
+  lda hdma.channel
+  and.w #HDMA.CHANNEL.ALLOCATED ~$ff
+  asl a
+  asl a
+  asl a
+  asl a
+  tax
+  plp
+  rts
+
+/**
+* allocates ram buffer for dynamic hdma effects
+*
+*/
+abstract.Hdma.allocateBuffer:
+  php
+  rep #$31
+  ldx hdma.ramBuffer.length
+  jsr core.wram.allocate
+  bcs +
+	pei (hdma.ramBuffer.length)
+    TRIGGER_ERROR E_OutOfWram
+
+
++ stx.b hdma.ramBuffer.start
+  sep #$20
+  sta.b hdma.ramBuffer.id
+  rep #$31
+  plp
+  rts
+
+abstract.Hdma.deallocateBuffer:
+  php
+  sep #$20
+  lda.b hdma.ramBuffer.id
+  beq +
+	jsr core.wram.deallocate
++
+  plp
+  rts
+
+/**
+* copy hdma struct from zero-page buffer to main hdma struct
+*
+* @param a<int, 8bit>   zero page buffer start adress
+*/
+abstract.Hdma.copyToMain:
+  php
+  rep #$31
+  and.w #$ff
+  tax
+  sep #$20
+  ldy.w #0
+-   lda 0,x
+    phx
+    tyx
+    sta.b hdma,x
+    plx
+    inx
+    iny
+    cpy.w #_sizeof_hdmaStruct
+    bcc -
+
+  plp
+  rts
+
+/**
+* copy hdma struct from main struct to zero-page buffer
+*
+* @param a<int, 8bit>   zero page buffer start adress
+*/
+abstract.Hdma.updateFromMain:
+  php
+  rep #$31
+  and.w #$ff
+  tax
+  sep #$20
+  ldy.w #0
+-   
+    phx
+    tyx
+    lda.b hdma,x
+    plx
+    sta 0,x
+    inx
+    iny
+    cpy.w #_sizeof_hdmaStruct
+    bcc -
+
+  plp
+  rts
+
+/**
+* allocate ram for table, then upload table there and set hdma pointer accordingly
+*
+* @param x<int, 8bit>   table length
+*/
+abstract.Hdma.uploadRomTable:
+  php
+  rep #$31
+  stx hdma.ramBuffer.length
+  jsr abstract.Hdma.allocateBuffer
+
+  jsr _uploadRomTable
+
+  lda.w #GLOBAL.wramBuffer.start
+  clc
+  adc hdma.ramBuffer.start
+  tax
+  sep #$20
+  lda #RAM
+  jsr abstract.Hdma.setTableAdress
+
+  plp
+  rts
+
+
+_uploadRomTable:
+  php
+  rep #$31
+  sep #$20
+  ldy #0
+  ldx hdma.ramBuffer.start
+-   lda [hdma.table.adress],y
+    sta.w GLOBAL.wramBuffer.start,x
+    iny
+    inx
+    cpy hdma.ramBuffer.length
+    bcc -
+
+  plp
+  rts
+  CLASS abstract.Hdma
+
+.ends

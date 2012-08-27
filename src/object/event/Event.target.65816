@@ -1,0 +1,16 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/event/Event.target.h"
+.section "Event.target"
+
+  ;debug, kill immediately
+  METHOD play
+  rep #$31
+  CALL Event.target.kill.MTD iterator.self
+  rts
+
+  CLASS Event.target
+.ends	
+	

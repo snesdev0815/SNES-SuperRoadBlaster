@@ -1,0 +1,13 @@
+<chapter name="game_over">
+	<timeline>
+		<timestart min="13" second="07" ms="250"/>	
+		<timeend min="13" second="10" ms="500"/>
+	</timeline>
+	<params>
+		<str key="controller" value="game"/>
+		<int key="cockpit" value="0"/>
+	</params>		
+	<result>
+		<playchapter name="score_entry"/>		
+	</result>
+</chapter>				

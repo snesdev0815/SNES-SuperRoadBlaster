@@ -1,0 +1,69 @@
+/**
+* dashboard sprite
+* 
+* @param a<int, 16bit>  x-pos
+* @param 1<int, 16bit>  y-pos
+*/
+.include "src/object/sprite/Sprite.life_car.h"
+.section "Sprite.life_car"
+
+  METHOD init
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  sta.b dimension.position.x + 1
+
+  lda OBJECT.CALL.ARG.2,s
+  sta.b dimension.position.y + 1
+
+  lda OBJECT.CALL.ARG.3,s
+  sta this.age
+  
+  sep #$20
+  lda.b #$1
+  sta.b animation.isLooping
+
+  lda #$f
+  sta.b animation.speed
+  lda #SPRITE.life_car.PTR
+  jsr abstract.Sprite.startAnimation
+
+
+  rts
+
+  METHOD play
+  rep #$31
+  jsr abstract.Sprite.playAnimation
+  
+  ;wait a bit, then speed across screen
+  lda this.age
+  bne +
+    lda this.speed
+    sec
+    sbc this.accel
+    sta this.speed
+    inc this.accel
+    
+    pea 0
+    pei (this.speed)
+    CALL Sprite.life_car.translate.MTD iterator.self
+    pla
+    pla
+    
+    ;kill if travelled beyond screen
+    lda.b dimension.position.x + 1
+    bmi _kill
+    rts
+    
++ dec this.age
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr abstract.Sprite.deallocate
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+  CLASS Sprite.life_car
+.ends	
+	

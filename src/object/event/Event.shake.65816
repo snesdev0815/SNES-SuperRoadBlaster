@@ -1,0 +1,74 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/event/Event.shake.h"
+.section "Event.shake"
+
+  METHOD init
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  sta.b event.startFrame
+  lda OBJECT.CALL.ARG.2,s
+  sta.b event.endFrame
+  lda OBJECT.CALL.ARG.3,s
+
+  stz this.age
+  rts
+
+  METHOD play
+  ;loop over all dash elements, move randomly
+  jsr abstract.Iterator.reset
+  
+-   lda.w #OBJECT.PROPERTIES.isDash
+    jsr abstract.Iterator.each.byProperties
+    bcc +
+
+    lda this.age
+    tax
+    lda.l Event.shake.LUT,x
+    and.w #$ff
+    xba     ;move to coarse-scroll tier
+    pha
+    pha
+
+    CALL Background.dashboard.translate.MTD iterator.target
+    pla
+    pla
+    
+    bra -
++
+  inc this.age
+  lda this.age
+  cmp #Event.shake.LUT.end - Event.shake.LUT
+  bcs _kill
+  
+  rts
+
+
+  METHOD kill
+  rep #$31
+  
+  lda #OBJR_kill
+  sta 3,s   
+  rts
+
+  CLASS Event.shake
+  
+;alias classes:
+  CLASS Event.player_crash
+  CLASS Event.debris_crash
+  CLASS Event.explode_crash
+  CLASS Event.landing_crash
+  CLASS Event.opponent_crash
+  CLASS Event.slide_crash
+  CLASS Event.soft_crash
+  CLASS Event.terrain_crash
+  CLASS Event.wall_crash
+  CLASS Event.window_crash
+  CLASS Event.macro_rockfast
+  CLASS Event.macro_vibrate1
+  CLASS Event.macro_vibrate2
+  CLASS Event.macro_vibrate3
+.ends	
+	

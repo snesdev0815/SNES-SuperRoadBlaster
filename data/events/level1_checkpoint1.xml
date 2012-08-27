@@ -1,0 +1,98 @@
+<chapter>
+	<timeline>
+		<timestart min="2" second="21" ms="381"/>	
+		<timeend min="2" second="33" ms="100"/>			
+	</timeline>
+
+	<params>
+		<str key="controller" value="game"/>
+		<int key="cockpit" value="1"/>
+		<int key="level" value="1"/>
+		
+		<!-- Debug stuff -->
+		<int key="godmode" value="1"/>
+		<int key="cursorSpeed" value="650"/>
+		<int key="analogControls" value="1"/>		
+	</params>	
+	
+<!-- Local Macros Override Global Macros -->	
+	<macros>
+	</macros>
+	
+	
+	<events>
+
+<!-- Start level checkpoint -->		
+		<event type="checkpoint">
+			<timeline>
+				<timestart min="2" second="21" ms="381"/>
+			</timeline>
+		</event>
+		
+		<event type="direction" automacro="sharpright" >
+			<timeline>
+				<timestart min="2" second="26" ms="101"/>
+				<timeend min="2" second="26" ms="935"/>
+			</timeline>
+			<params>
+				<str key="type" value="right"/>
+				<int key="score" value="800"/>
+			</params>
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>
+		</event> 
+		
+						
+	<!--2-->	
+	
+		<event type="direction" automacro="sharpleft">
+			<timeline>
+				<timestart min="2" second="27" ms="310"/>
+				<timeend min="2" second="28" ms="145"/>
+			</timeline>
+			<params>
+				<str key="type" value="left"/>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event>
+
+	<!--3-->
+		<event type="direction" automacro="sharpleft">
+			<timeline>
+				<timestart min="2" second="29" ms="521"/>
+				<timeend min="2" second="30" ms="480"/>
+			</timeline>
+			<params>
+				<str key="type" value="left"/>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash1"></playchapter>
+			</result>					
+		</event> 	
+			
+	<!--4-->
+		<event type="direction" automacro="sharpright">
+			<timeline>
+				<timestart min="2" second="31" ms="106"/>
+				<timeend min="2" second="32" ms="065"/>
+			</timeline>
+			<params>
+				<str key="type" value="right"/>
+				<int key="score" value="800"/>
+			</params>	
+			<result value="0">
+				<playchapter name="level1_crash2"></playchapter>
+			</result>					
+		</event> 		
+ 
+	</events>
+
+	<result>
+		<playchapter name="level1_checkpoint2"/>
+	</result>
+</chapter>

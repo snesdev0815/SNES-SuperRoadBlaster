@@ -1,0 +1,823 @@
+.include "src/text/textstrings.h"
+	
+.section "textstrings" superfree
+
+/*
+T_EXCP_exception:
+	.db TC_pos
+	.dw $42
+	.db TC_sub
+	.dw T_EXCP_starLine.PTR
+	.db "a fatal error has occured!",TC_brk
+	.db TC_sub
+	.dw T_EXCP_starLine.PTR
+	.db "error-message:"
+	.db TC_pos
+	.dw $182
+	.db TC_sub
+	.dw T_EXCP_starLine.PTR
+	.db TC_sub
+	.dw T_EXCP_cpuInfo.PTR
+	.db TC_sub
+	.dw T_EXCP_starLine.PTR
+	.db TC_brk
+	.db "Found a bug?",TC_brk
+	.db "Please report to:",TC_brk
+	.db "matt@dforce3000.de"
+	.db TC_end
+*/
+
+T_EXCP_exception:
+    .db TC_pos
+    .dw $42
+    .db TC_sub
+    .dw T_EXCP_starLine.PTR
+    .db "a fatal error has occured!",TC_brk
+    .db TC_sub
+    .dw T_EXCP_starLine.PTR
+    .db "error-message:"
+    .db TC_pos
+    .dw $1c2
+    .db TC_sub
+    .dw T_EXCP_starLine.PTR
+    .db "Data access errors may be",TC_brk
+    .db "caused by slow storage media",TC_brk
+    .db "or bad and/or missing files.",TC_brk,
+    .db TC_sub
+    .dw T_EXCP_starLine.PTR
+    .db TC_end
+
+T_EXCP_starLine:
+	.db "****************************",TC_brk,TC_end
+	
+T_EXCP_cpuInfo:
+	.db "cpu status:",TC_brk
+	.db "a:   ",TC_hToS
+	.dw excA
+	.db :excA,
+	.db 2," x:   ",TC_hToS
+	.dw excX
+	.db :excX,
+	.db 2," y: ",TC_hToS
+	.dw excY
+	.db :excY,
+	.db 2,TC_brk,"flag:  ",TC_hToS
+	.dw excFlags
+	.db :excFlags,
+	.db 1," stck:",TC_hToS
+	.dw excStack
+	.db :excStack,
+	.db 2," pc:",TC_hToS
+	.dw excPc
+	.db :excPc,
+	.db 2,TC_brk,"dp:  ",TC_hToS
+	.dw excDp
+	.db :excDp,
+	.db 2," pb:    ",TC_hToS
+	.dw excPb
+	.db :excPb,
+	.db 1," db:  ",TC_hToS
+	.dw excDb
+	.db :excDb,
+	.db 1,TC_brk,TC_end
+
+T_EXCP_sa1Info:
+	.db "SA-1 status:",TC_brk
+	.db "cp:  ",TC_hToS
+	.db " flags: ",TC_hToS
+	.dw $2300
+	.db 0,2
+	.db TC_brk,"ver: ",TC_hToS
+	.dw $230e
+	.db 0,2
+	.db " frame: ",TC_hToS
+	.db TC_brk,TC_end
+
+T_EXCP_irqInfo:
+	.db "IRQ status:",TC_brk
+	.db "NMIs:   ",TC_hToS
+	.dw FrameCounter
+	.db FrameCounter>>16,2
+	.db " IRQs:   ",TC_hToS
+	.dw irqCount
+	.db irqCount>>16,2
+	.db TC_brk,"chrIRQs:",TC_hToS
+	.dw dmaIrqCount
+	.db dmaIrqCount>>16,2
+	.db " frmIRQs:",TC_hToS
+	.dw frameIrqCount
+	.db frameIrqCount>>16,2,TC_brk
+	.db "framebuffer:",TC_hToS
+	.dw frameBuffHistory
+	.db frameBuffHistory>>16,3
+	.db " irqCp:",TC_hToS
+	.dw irqCheckpoint
+	.db irqCheckpoint>>16,1,TC_brk
+	.db TC_end
+
+
+T_EXCP_E_StackTrash:
+	.db TC_pos
+	.dw $102
+	.db "Routine ",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db "has trashed the stack.",TC_end
+
+T_EXCP_E_Sa1IramCode:
+	.db TC_pos
+	.dw $102
+	.db "Error while copying",TC_brk,"SA-1 bootcode to I-RAM,",TC_brk,"aborting...",TC_end
+
+T_EXCP_E_Sa1IramClear:
+	.db TC_pos
+	.dw $102
+	.db "Error while clearing",TC_brk,"SA-1 I-RAM, aborting...",TC_end
+
+	
+T_EXCP_E_ObjLstFull:
+	.db TC_pos
+	.dw $102
+	.db "No free slot left to create",TC_brk
+	.db "instance of class ",TC_diSub
+	.dw GLOBAL.currentClassStr
+	.db ".",TC_end
+
+T_EXCP_E_ObjRamFull:
+	.db TC_pos
+	.dw $102
+	.db "Unable to allocate ram",TC_brk
+	.db "for instance of class ",TC_diSub
+	.dw GLOBAL.currentClassStr
+	.db ",",TC_brk,"insufficient memory.",TC_end
+
+T_EXCP_E_Brk:
+	.db TC_pos
+	.dw $102
+	.db "BRK encountered.",TC_brk,TC_sub
+	.dw T_EXCP_LastCalled.PTR
+	.db TC_end
+
+T_EXCP_E_StackOver:
+	.db TC_pos
+	.dw $102
+	.db "Stack overflow detected.",TC_brk,TC_sub
+	.dw T_EXCP_LastCalled.PTR
+	.db TC_end
+
+
+T_EXCP_LastCalled:
+	.db "Last called method was ",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_ClassMethod:
+	.db TC_diSub
+	.dw GLOBAL.currentClassStr
+	.db "::",TC_diSub
+	.dw GLOBAL.currentMethodStr
+	.db "()",TC_end
+
+T_EXCP_HexTest:
+	.db "hex test:",TC_hToS
+	.dw 0
+	.db $c0
+	.db 16,", lala!",TC_end
+
+T_EXCP_Sa1Test:
+	.db TC_pos
+	.dw $102
+	.db "Exited ok!",TC_end
+
+T_EXCP_Sa1NoIrq:
+	.db TC_pos
+	.dw $102
+	.db "SA-1 didn't generate",TC_brk
+	.db "char-conversion IRQ.",TC_end
+
+T_EXCP_Todo:
+	.db TC_pos
+	.dw $102
+	.db "TODO:",TC_brk
+	.db "Routine needs reworking",TC_end
+
+T_EXCP_SpcTimeout:
+	.db TC_pos
+	.dw $102
+	.db "SPC700 communication",TC_brk
+	.db "timeout.",TC_end
+
+T_EXCP_ObjBadHash:
+	.db TC_pos
+	.dw $102
+	.db "Bad object hash encountered",TC_brk
+	.db "while dispatching obj method.",TC_end
+
+T_EXCP_ObjBadMethod:
+	.db TC_pos
+	.dw $102
+	.db "Unable to execute non-existant",TC_brk
+	.db "method ",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_ObjNotFound:
+	.db TC_pos
+	.dw $102
+	.db "Unable to execute method",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db TC_brk,"on non-existant object.",TC_end
+
+T_EXCP_undefined:
+	.db "undefined",TC_end
+
+T_EXCP_BadScript:
+	.db TC_pos
+	.dw $102
+	.db "Script at $C0:",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2
+	.db " is",TC_brk
+	.db "invalid or no script at all.",TC_end
+
+T_EXCP_StackUnder:
+	.db TC_pos
+	.dw $102
+	.db "Stack underflow detected.",TC_brk,TC_sub
+	.dw T_EXCP_LastCalled.PTR
+	.db TC_end
+
+T_EXCP_E_Cop:
+	.db TC_pos
+	.dw $102
+	.db "COP encountered.",TC_brk,TC_sub
+	.dw T_EXCP_LastCalled.PTR
+	.db TC_end
+
+T_EXCP_E_ScriptStackTrash:
+	.db TC_pos
+	.dw $102
+	.db "A script has trashed the",TC_brk
+	.db "stack.",TC_sub
+	.dw T_EXCP_LastCalled.PTR
+	.db TC_end
+
+T_EXCP_E_UnhandledIrq:
+	.db TC_pos
+	.dw $102
+	.db "Unhandled IRQ encountered.",TC_end
+
+T_EXCP_E_Sa1BWramClear:
+	.db TC_pos
+	.dw $102
+	.db "Error while clearing",TC_brk,"SA-1 framebuffer, aborting...",TC_end
+
+T_EXCP_E_Sa1NoBWram:
+	.db TC_pos
+	.dw $102
+	.db "No SA-1 BW-RAM present,",TC_brk,TC_sub
+	.dw T_EXCP_Sa1BwramReq.PTR
+	.db TC_end
+
+
+T_EXCP_E_Sa1BWramToSmall:
+	.db TC_pos
+	.dw $102
+	.db "SA-1 BW-RAM too small,",TC_brk,TC_sub
+	.dw T_EXCP_Sa1BwramReq.PTR
+	.db TC_end
+
+
+T_EXCP_Sa1BwramReq:
+	.db "at least 64kkbyte required.",TC_end
+
+T_EXCP_E_Sa1DoubleIrq:
+	.db TC_pos
+	.dw $102
+	.db "SA-1 generated ambiguous IRQ.",TC_end
+
+T_EXCP_E_SpcNoStimulusCallback:
+	.db TC_pos
+	.dw $102
+	.db "No callback routine for",TC_brk
+	.db "SPC stimulus registered.",TC_end
+
+T_EXCP_E_Msu1NotPresent:
+	.db TC_pos
+	.dw $102
+	.db "Msu1 hardware not found.",TC_end
+
+T_EXCP_E_Msu1FileNotPresent:
+	.db TC_pos
+	.dw $102
+	.db "Found Msu1 hardware, but",TC_brk
+	.db "valid Msu1 data-file is",TC_brk
+	.db "missing.",TC_end
+
+T_EXCP_E_Msu1SeekTimeout:
+	.db TC_pos
+	.dw $102
+	.db "Timeout while seeking to",TC_brk
+	.db "adress in Msu1 data-file.",TC_end
+
+T_EXCP_E_Msu1InvalidFrameRequested:
+	.db TC_pos
+	.dw $102
+	.db "Invalid video-frame request",TC_brk
+	.db TC_sub
+	.dw T_EXCP_E_methodStackObj.PTR
+	.db TC_end
+
+T_EXCP_E_DmaQueueFull:
+	.db TC_pos
+	.dw $102
+	.db "No free DMA-queue-slot",TC_brk
+	.db "left ",
+	.db TC_sub
+	.dw T_EXCP_E_methodStackObj.PTR
+	.db TC_end
+
+T_EXCP_E_methodStackObj:
+	.db "for method ",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_InvalidDmaTransferType:
+	.db TC_pos
+	.dw $102
+	.db "Illegal DMA transfer type",TC_brk
+	.db "$",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " issued",TC_brk
+	.db TC_sub
+	.dw T_EXCP_E_methodStackObj.PTR
+	.db TC_end
+
+T_EXCP_E_InvalidDmaTransferLength:
+	.db TC_pos
+	.dw $102
+	.db "DMA transfer with invalid",TC_brk
+	.db "length $",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2
+	.db " issued ",TC_brk,TC_sub
+	.dw T_EXCP_E_methodStackObj.PTR
+	.db TC_end
+
+T_EXCP_E_VallocBadStepsize:
+	.db TC_pos
+	.dw $102
+	.db "Bad stepsize ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "requested while ",TC_brk
+	.db "allocating VRAM.",TC_end
+
+T_EXCP_E_VallocEmptyDeallocation:
+	.db TC_pos
+	.dw $102
+	.db "No allocated blocks of ",TC_brk
+	.db "id#",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " found",TC_brk
+	.db "while deallocating VRAM.",TC_end
+
+T_EXCP_E_UnitTestComplete:
+	.db TC_pos
+	.dw $102
+	.db "All unit tests completed",TC_brk
+	.db "successfully.",TC_end
+
+T_EXCP_E_UnitTestFail:
+	.db TC_pos
+	.dw $102
+	.db "Unit test id#",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " failed.",TC_end
+
+T_EXCP_E_VallocInvalidLength:
+	.db TC_pos
+	.dw $102
+	.db "Illegal VRAM allocation",TC_brk
+	.db "call, zero length.",TC_brk
+	.db "requested.",TC_end
+
+T_EXCP_E_CGallocInvalidLength:
+	.db TC_pos
+	.dw $102
+	.db "Illegal CGRAM allocation",TC_brk
+	.db "call, zero length.",TC_brk
+	.db "requested.",TC_end
+
+T_EXCP_E_CGallocBadStepsize:
+	.db TC_pos
+	.dw $102
+	.db "Bad stepsize ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "requested while ",TC_brk
+	.db "allocating CGRAM.",TC_end
+
+T_EXCP_E_CGallocInvalidStart:
+	.db TC_pos
+	.dw $102
+	.db "Invalid start ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "requested while ",TC_brk
+	.db "allocating CGRAM.",TC_end
+
+T_EXCP_E_CGallocEmptyDeallocation:
+	.db TC_pos
+	.dw $102
+	.db "No allocated blocks of",TC_brk
+	.db "id#",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " found",TC_brk
+	.db "while deallocating CGRAM.",TC_end
+
+T_EXCP_E_BadParameters:
+	.db TC_pos
+	.dw $102
+	.db "Bad parameters passed to",TC_brk
+	.db "method ",TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_OutOfVram:
+	.db TC_pos
+	.dw $102
+	.db "Unable to allocate $",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "bytes of VRAM in method",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_OutOfCgram:
+	.db TC_pos
+	.dw $102
+	.db "Unable to allocate $",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "bytes of CGRAM in method",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_InvalidException:
+	.db TC_pos
+	.dw $102
+	.db "Exception of unknown origin.",TC_brk,TC_sub
+	.dw T_EXCP_LastCalled.PTR
+	.db TC_end
+
+T_EXCP_E_Msu1InvalidFrameCycle:
+	.db "Msu1 video-frame cycle-",TC_brk
+	.db "counter has invalid value",TC_brk,TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db ".",TC_end
+
+T_EXCP_E_Msu1InvalidChapterRequested:
+	.db TC_pos
+	.dw $102
+	.db "Invalid video chapter request",TC_brk
+	.db TC_sub
+	.dw T_EXCP_E_methodStackObj.PTR
+	.db TC_end
+
+T_EXCP_E_Msu1InvalidChapter:
+	.db TC_pos
+	.dw $102
+	.db "Video chapter ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1,TC_brk
+	.db "is invalid.",TC_end
+
+T_EXCP_E_Msu1AudioSeekTimeout:
+	.db TC_pos
+	.dw $102
+	.db "Timeout while seeking to",TC_brk
+	.db "Msu1 audio track ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db ".",TC_end
+
+T_EXCP_E_Msu1AudioPlayError:
+	.db TC_pos
+	.dw $102
+	.db "Unable to play Msu1",TC_brk
+	.db "audio track ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db ".",TC_end
+
+T_EXCP_E_ObjStackCorrupted:
+	.db TC_pos
+	.dw $102
+	.db "Object-stack has been",TC_brk
+	.db "corrupted ",
+	.db TC_sub
+	.dw T_EXCP_E_methodStackObj.PTR
+	.db TC_end
+
+T_EXCP_E_BadEventResult:
+	.db TC_pos
+	.dw $102
+	.db "Event.result at $C0:",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2
+	.db " is",TC_brk
+	.db "invalid or no result at all.",TC_end
+
+T_EXCP_E_abstractClass:
+	.db TC_pos
+	.dw $102
+	.db "Instanciation of abstract",TC_brk
+	.db "class ",TC_diSub
+	.dw GLOBAL.currentClassStr
+	.db TC_brk,"is disallowed.",TC_end
+
+T_EXCP_E_NoChapterFound:
+	.db TC_pos
+	.dw $102
+	.db TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db TC_brk,"is unable to find",TC_brk
+	.db "current chapter object.",TC_end
+
+T_EXCP_E_NoCheckpointFound:
+	.db TC_pos
+	.dw $102
+	.db TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db TC_brk,"is unable to find",TC_brk
+	.db "checkpoint to return to.",TC_end
+
+T_EXCP_E_BadSpriteAnimation:
+	.db TC_pos
+	.dw $102
+	.db "Spriteanimation ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " is",TC_brk
+	.db "invalid or no animation",TC_brk
+	.db "at all.",TC_end
+
+
+T_EXCP_E_AllocatedVramExceeded:
+	.db TC_pos
+	.dw $102
+	.db "Spriteanimation ",TC_hToS
+	.dw (excArgs+2)
+	.db (excArgs+2)>>16,1
+	.db ", frm ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "exceeds allocated VRAM space",TC_brk
+	.db "in ",TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_AllocatedCgramExceeded:
+	.db TC_pos
+	.dw $102
+	.db "Spriteanimation ",TC_hToS
+	.dw (excArgs+2)
+	.db (excArgs+2)>>16,1
+	.db ", frm ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "exceeds allocated CGRAM space",TC_brk
+	.db "in ",TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_InvalidDmaChannel:
+	.db TC_pos
+	.dw $102
+	.db "DMA-channel id ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " is",TC_brk
+	.db "invalid, unable to deallocate.",TC_end
+
+T_EXCP_E_DmaChannelEmpty:
+	.db TC_pos
+	.dw $102
+	.db "DMA-channel id ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " is",TC_brk
+	.db "empty, unable to deallocate.",TC_end
+
+T_EXCP_E_NoDmaChannel:
+	.db TC_pos
+	.dw $102
+	.db "Unable to allocate DMA-channel.",TC_end
+
+T_EXCP_E_VideoMode:
+	.db TC_pos
+	.dw $102
+	.db "Video-mode detection",TC_brk
+	.db "complete, cycle-counter",TC_brk
+	.db "is at $",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2
+	.db ".",TC_end
+
+T_EXCP_E_BadBgAnimation:
+	.db TC_pos
+	.dw $102
+	.db "Bganimation ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " is",TC_brk
+	.db "invalid or no animation",TC_brk
+	.db "at all.",TC_end
+
+T_EXCP_E_BadBgLayer:
+	.db TC_pos
+	.dw $102
+	.db "$",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " is not a valid",TC_brk
+	.db "physical bg-layer-id",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_NtscUnsupported:
+	.db TC_pos
+	.dw $102
+	.db "Sorry, NTSC-mode is not",TC_brk
+	.db "supported yet.",TC_end
+
+T_EXCP_E_WallocBadStepsize:
+	.db TC_pos
+	.dw $102
+	.db "Bad stepsize ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "requested while ",TC_brk
+	.db "allocating WRAM.",TC_end
+
+T_EXCP_E_WallocEmptyDeallocation:
+	.db TC_pos
+	.dw $102
+	.db "No allocated blocks of ",TC_brk
+	.db "id#",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " found",TC_brk
+	.db "while deallocating WRAM.",TC_end
+
+T_EXCP_E_OutOfWram:
+	.db TC_pos
+	.dw $102
+	.db "Unable to allocate $",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "bytes of WRAM in method",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_BadInputDevice:
+	.db TC_pos
+	.dw $102
+	.db "Bad input device ",TC_brk
+	.db "id#",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,1
+	.db " accessed",TC_brk,TC_sub
+	.dw T_EXCP_ClassMethod.PTR
+	.db ".",TC_end
+
+T_EXCP_E_ScoreTest:
+	.db TC_pos
+	.dw $102
+	.db "Got score value of",TC_brk
+	.db "hex: ",TC_hToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_brk
+	.db "dec: ",TC_dToS
+	.dw excArgs
+	.db excArgs>>16,2,TC_end
+
+T_hallOfFame:
+	.db TC_pos
+	.dw $11
+	.db " HALL OF FAME",TC_brk
+	.db TC_end
+
+T_highScore:
+	.db TC_dToS
+	.dw GLOBAL.CORE.STRING.argument.0
+	.db GLOBAL.CORE.STRING.argument.0>>16,1
+	.db ".",TC_dSub
+	.dw GLOBAL.CORE.STRING.argument.1
+	.db GLOBAL.CORE.STRING.argument.1>>16
+	.db ":",TC_dToS
+	.dw GLOBAL.CORE.STRING.argument.3
+	.db GLOBAL.CORE.STRING.argument.3>>16,2
+	.db "000",TC_brk,TC_end
+
+
+T_title:
+	.db TC_pos
+	.dw $306
+	.db "  (C)1986 Data East",TC_brk
+	.db "ported by d4s in 2012",TC_end
+
+T_schleck:
+    .db TC_pos
+    .dw $22
+    .db "Schleck!",TC_brk
+    .db "Ich bin es wirklich."
+    .db TC_end
+
+;might not work yet
+T_EXCP_E_Msu1FrameBad:
+    .db TC_pos
+    .dw $102
+    .db "Video-frame ",TC_hToS
+    .dw excArgs
+    .db excArgs>>16,2, " of", TC_brk
+    .db "chapter ",TC_hToS
+    .dw (excArgs+2)
+    .db (excArgs+2)>>16,2," is bad.",TC_end
+
+T_dreck:
+    .db TC_pos
+    .dw $22
+    .db "Ich will mich nicht waschen.",TC_brk
+    .db "Das ist schlecht für meine Flechten.",TC_brk
+    .db "Meine Laeuse sind allergisch gegen Reinigung.",TC_brk
+    .db "Auf ne Dusche oder Schaumbad kann ich gut und gern verzichten.",TC_brk
+    .db "Deutschland verdrecke!"
+    .db TC_end
+
+T_scoreEntry:
+    .db TC_pos
+    .dw $11
+    .db "Enter name:",TC_brk,TC_brk
+    .db TC_end
+
+T_scoreEntryName:
+    .db TC_pos
+    .dw $41
+    .db TC_dSub
+    .dw GLOBAL.CORE.STRING.argument.0
+    .db GLOBAL.CORE.STRING.argument.0>>16
+    .db " :",TC_dToS
+    .dw GLOBAL.CORE.STRING.argument.2
+    .db GLOBAL.CORE.STRING.argument.2>>16,2
+    .db "000",TC_end
+
+T_EXCP_E_BadIrq:
+    .db TC_pos
+    .dw $102
+    .db "Bad IRQ callback registration.",TC_end
+
+T_EXCP_E_NoIrqCallback:
+    .db TC_pos
+    .dw $102
+    .db "No IRQ callback registered.",TC_end
+
+T_EXCP_E_BadIrqCallback:
+    .db TC_pos
+    .dw $102
+    .db "Registred IRQ callback is bad.",TC_end
+
+T_levelComplete:
+    .db TC_pos
+    .dw $11
+    .db "   LEVEL ",TC_dToS
+    .dw GLOBAL.CORE.STRING.argument.0
+    .db GLOBAL.CORE.STRING.argument.0>>16,1,TC_brk
+    .db "   COMPLETE",TC_brk,TC_brk
+    .db "SCORE: ",TC_dToS
+    .dw GLOBAL.CORE.STRING.argument.1
+    .db GLOBAL.CORE.STRING.argument.1>>16,2
+    .db "000",TC_end
+
+T_EXCP_E_SramBad:
+    .db TC_pos
+    .dw $102
+    .db "Error writing to SRAM at",TC_brk
+    .db "adress $",TC_hToS
+    .dw (excArgs+2)
+    .db (excArgs+2)>>16,1,
+    .db ":",TC_hToS
+    .dw excArgs
+    .db excArgs>>16,2,TC_end
+
+
+
+;used to check maximum valid string id
+T_max:
+	.db "Max string id.",TC_end
+.ends

@@ -1,0 +1,15 @@
+<chapter name="highscores">
+	<timeline>
+		<timestart min="12" second="36" ms="283"/>	
+		<timeend min="13" second="06" ms="889"/>
+	</timeline>
+	<params>
+		<str key="controller" value="highscores"/>
+		<int key="cockpit" value="0"/>
+	</params>		
+	<events>
+	</events>
+	<result>
+		<restartchapter/>	
+	</result>	
+</chapter>

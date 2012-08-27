@@ -1,0 +1,72 @@
+/**
+* life_counter sprite
+* This is an extremely gruesome, hardcoded hack
+* Don't try this at home, kids...
+* 
+* @param a<int, 16bit>  x-pos
+* @param 1<int, 16bit>  y-pos
+*/
+.include "src/object/sprite/Sprite.life_counter.h"
+.section "Sprite.life_counter"
+
+  METHOD init
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  sta.b dimension.position.x + 1
+
+  lda OBJECT.CALL.ARG.2,s
+  sta.b dimension.position.y + 1
+
+  lda OBJECT.CALL.ARG.3,s
+  sta this.age
+
+  lda #SPRITE.life_counter.PTR
+  jsr abstract.Sprite.startAnimation
+  
+  NEW Player.CLS.PTR this.player
+  CALL Player.getLifeCount.MTD this.player
+
+  sta.b this.lifes
+  jsr abstract.Sprite.playAnimation
+/*
+  lda #SPRITE.LIFE_CAR.MAXAGE
+  sta this.age
+*/  
+  rts
+
+  METHOD play
+  rep #$31
+  lda.b this.lifes
+  sta.b animation.frame.current
+  
+  jsr abstract.Sprite.playAnimation
+
+  ;wait a bit, then disappear above screen
+  lda this.age
+  bne +
+    
+    pea -32
+    pea 0
+    CALL Sprite.life_car.translate.MTD iterator.self
+    pla
+    pla
+    
+    ;kill if travelled beyond screen
+    lda.b dimension.position.y + 1
+    bmi _kill
+    rts
+    
++ dec this.age
+  rts  
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr abstract.Sprite.deallocate
+  lda #OBJR_kill
+  sta 3,s   
+  rts
+
+  CLASS Sprite.life_counter
+.ends	
+	

@@ -1,0 +1,28 @@
+/*
+* part of a very crude function inheritance model
+*
+* when included at the end inside of an object section,
+* this file will implement all common object methods not yet defined in object itself,
+* resulting in less redundant typed code and implementation stringency.
+* could also be used to implement something similar to abstract methods.
+*/
+.ifndef __init
+  .define __init
+  _init:
+	rts
+.endif
+
+.ifndef __play
+  .define __play
+  _play:
+	rts
+.endif
+
+.ifndef __kill
+  .define __kill
+  _kill:
+	rep #$31
+	lda #OBJR_kill
+	sta 3,s  
+	rts
+.endif

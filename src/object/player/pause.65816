@@ -1,0 +1,89 @@
+/**
+* brightness handler, fades in/out
+*/
+.include "src/object/player/pause.h"
+.section "pause"
+
+  /**
+  *
+  */
+  METHOD init
+  rep #$31
+  NEW Brightness.CLS.PTR this.brightness
+
+/*  sep #$20
+  lda #PAUSE.DELAY
+  sta this.wait */
+  rts
+
+  /**
+  *
+  */
+  METHOD play
+/*  ;extremely bad hack, wait a couple of frames before allowing pause to happen to allow msu1 to initialize
+  sep #$20
+  lda this.wait
+  beq +
+    dec this.wait
+    rts
+
++ */
+  rep #$31
+
+  ;pause button pressed?
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #JOY_BUTTON_START
+  beq +
+	sep #$20
+
+	;fetch msu1 object if present
+	jsr abstract.Iterator.reset
+	lda.b #OBJID.Msu1
+	jsr abstract.Iterator.each.byId
+	bcc +
+		lda this.status
+		eor.b #PAUSE.STATUS.ENABLED
+		sta this.status
+		beq ++
+
+		  CALL Msu1.pause.MTD iterator.target
+		  CALL Brightness.get.MTD this.brightness
+		  sta this.brightness.buffer
+		  lda #PAUSE.BRIGHTNESS
+		  CALL Brightness.fadeTo.MTD this.brightness
+		  rep #$31
+		  lda.w #(JOY_DIR_LEFT | JOY_DIR_RIGHT | JOY_BUTTON_A | JOY_BUTTON_B) ~$ffff
+		  ldx #INPUT.DEVICE.ID.0
+		  jsr core.input.setMask
+		  bra +
+++
+		  CALL Msu1.resume.MTD iterator.target
+		  lda this.brightness.buffer
+		  CALL Brightness.fadeTo.MTD this.brightness
+		  ldx #INPUT.DEVICE.ID.0
+		  jsr core.input.resetMask
++
+
+;sometimes, msu1 video keeps on playing even if paused, so we just keep on calling pause until it registers (bad hack).
+  sep #$20
+  lda this.status
+  beq +
+    lda.w FrameCounter
+    and #$1f
+    bne +
+
+    jsr abstract.Iterator.reset
+    lda.b #OBJID.Msu1
+    jsr abstract.Iterator.each.byId
+    bcc +
+      CALL Msu1.pause.MTD iterator.target
+
++
+  rts
+
+
+
+  CLASS Pause
+.ends	
+	

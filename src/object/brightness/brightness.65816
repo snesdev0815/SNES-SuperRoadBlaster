@@ -1,0 +1,103 @@
+/**
+* brightness handler, fades in/out
+*/
+.include "src/object/brightness/brightness.h"
+.section "brightnesssss"
+
+  /**
+  *
+  */
+  METHOD init
+  sep #$20
+  lda.w ScreenBrightness
+  sta.b this.current
+  sta.b this.target
+  lda.b #BRIGHTNESS.SPEED.DEFAULT
+  sta.b this.speed
+  rts
+
+  /**
+  *
+  */
+  METHOD play
+  sep #$20
+  jsr _isDone
+  bcs ++
+	lda this.current
+	cmp this.target
+	bcc +
+	  dec this.current
+	  bra ++
+
++	inc this.current
+  
+++
+  lda this.current
+  sta.w ScreenBrightness
+  rts
+
+  /**
+  * fade to target brightness
+  */
+  METHOD fadeTo
+  sep #$20
+;  jsr _isDone
+;  bcc ++
+	cmp.b #BRIGHTNESS.FULL + 1
+	bcc +
+      TRIGGER_ERROR E_Todo
+
++	sta this.target
+	sec
+	rts
+
+/*++
+  clc
+  rts*/
+
+  /**
+  * has target brightness been reached?
+  */
+  METHOD isDone
+  pha
+  php
+  sep #$20
+  lda this.current
+  cmp this.target
+  bne +
+	plp
+	pla
+	sec	
+	rts
+
++ plp
+  pla
+  clc
+  rts
+
+  /**
+  * get current brightness target
+  */
+  METHOD get
+  php
+  sep #$20
+  lda this.target
+  plp
+  rts
+
+  /**
+  * set current brightness target
+  */
+  METHOD set
+  php
+  sep #$20
+  sta this.target
+  sta this.current
+  sta.w ScreenBrightness
+  plp
+  rts
+
+  CLASS Brightness get set fadeTo isDone
+
+.ends	
+	

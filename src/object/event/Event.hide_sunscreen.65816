@@ -1,0 +1,16 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/event/Event.hide_sunscreen.h"
+.section "Event.hide_sunscreen"
+
+  ;debug, kill immediately
+  METHOD play
+  rep #$31
+  CALL Event.hide_sunscreen.kill.MTD iterator.self
+  rts
+
+  CLASS Event.hide_sunscreen
+.ends	
+	

@@ -1,0 +1,89 @@
+/**
+* dma channel manager.
+*
+* just provides a way to automatically de/allocate any of the available channels
+*/
+
+
+.include "src/core/dma_channel.h"
+.section "core.dma_channel"
+
+
+/**
+* just clearing all buffers, reserving channels 0,1 for dma for now
+*
+*/
+core.dma_channel.init:
+  php
+  sep #$20
+  lda #0
+  ldy.w #GLOBAL.DMA_CHANNELS.END - GLOBAL.DMA_CHANNELS.START
+  ldx.w #GLOBAL.DMA_CHANNELS.START
+  jsr ClearWRAM
+
+  ;lda #TRUE
+  ;sta.w GLOBAL.DMA_CHANNELS.7.entry
+  ;sta.w GLOBAL.DMA_CHANNELS.1.entry
+  plp
+  rts
+
+/**
+* allocates dma channel
+*
+* @return c <bool>	true if allocations successfull
+* @return a <int, 8bit>	channel id
+*/
+core.dma_channel.allocate:
+  php
+  rep #$31
+  sep #$20
+  ldx #0
+-	lda.w GLOBAL.DMA_CHANNELS.START,x
+	beq +
+
+	inx
+	cpx #GLOBAL.DMA_CHANNELS.END - GLOBAL.DMA_CHANNELS.START
+	bcc -
+
+  plp
+  clc
+  rts
+
+;channel found
++ lda #TRUE
+  sta.w GLOBAL.DMA_CHANNELS.START,x
+  txa
+  plp
+  sec
+  rts
+
+/**
+* deallocates dma channel, throws error if channel not allocated or id invalid
+*
+* @param a <int, 8bit>	channel id to deallocate
+*/
+core.dma_channel.deallocate:
+  php
+  rep #$31
+  and.w #$ff
+  tax
+  sep #$20
+  cmp #DMA_CHANNELS.COUNT
+  bcc +
+	pha
+    TRIGGER_ERROR E_InvalidDmaChannel
+
+	stp
+
++ lda.w GLOBAL.DMA_CHANNELS.START,x
+  bne +
+	pha
+    TRIGGER_ERROR E_DmaChannelEmpty
+	stp
+
++ stz.w GLOBAL.DMA_CHANNELS.START,x
+  plp
+  rts
+
+
+.ends

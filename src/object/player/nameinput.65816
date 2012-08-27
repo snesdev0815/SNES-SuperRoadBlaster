@@ -1,0 +1,145 @@
+/**
+* uses joypad input to generate player name
+*/
+.include "src/object/player/nameinput.h"
+.section "Player.nameinput"
+
+  /**
+  *
+  */
+  METHOD init
+  rep #$31
+  sep #$20
+  ldx #NAMEINPUT.LENGTH
+  lda #NAMEINPUT.CHAR.DEFAULT
+
+-   sta this.name-1,x
+    dex
+    bne - 
+  stz this.name + NAMEINPUT.LENGTH + 1
+  rts
+
+  /**
+  *
+  */
+  METHOD play
+  sep #$20
+  lda this.isDone
+  beq +
+    rts
+
++
+  rep #$31
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #JOY_BUTTON_A
+  beq +
+    sep #$20
+    lda this.cursor.position
+    inc a
+    cmp #NAMEINPUT.LENGTH
+    bcc ++
+      lda #TRUE
+      sta this.isDone
+      lda #NAMEINPUT.LENGTH-1
+++
+    sta this.cursor.position
++
+  rep #$31
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #JOY_BUTTON_B
+  beq +
+    sep #$20
+    dec this.cursor.position
+    bpl +
+      stz this.cursor.position
+
++
+  rep #$31
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #JOY_DIR_UP
+  beq +
+    lda this.cursor.position
+    and.w #$ff
+    tax
+    sep #$20
+    lda this.name,x
+    inc a
+    cmp #NAMEINPUT.CHAR.END+1
+    bcc ++
+      lda #NAMEINPUT.CHAR.START
+++
+    sta this.name,x
++
+  rep #$31
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #JOY_DIR_DOWN
+  beq +
+    lda this.cursor.position
+    and.w #$ff
+    tax
+    sep #$20
+    lda this.name,x
+    dec a
+    cmp #NAMEINPUT.CHAR.START
+    bcs ++
+      lda #NAMEINPUT.CHAR.END
+++
+    sta this.name,x
++
+  rts
+
+  /**
+  * returns name
+  *
+  * @return c <bool>    true if name has been entered completely
+  * @return x <char, 16bit>    first part of name
+  * @return y <char, 16bit>    second part of name
+  */
+  METHOD getName
+  sep #$20
+  clc
+  lda this.isDone
+  beq +
+    sec
++ ldx this.name
+  ldy this.name+2
+  rts
+
+  /**
+  * returns name, with blinking cursor
+  *
+  * @return x <char, 16bit>    first part of name
+  * @return y <char, 16bit>    second part of name
+  */
+  METHOD getScreenBuffer
+  rep #$31
+  pei (this.name)
+  pei (this.name+2)
+  lda this.cursor.position
+  and.w #$ff
+  tax
+  sep #$20
+  inc this.cursor.status
+  lda this.cursor.status
+  bit #NAMEINPUT.CURSOR.DELAY
+  beq +
+    lda #NAMEINPUT.CURSOR.CHAR
+    sta this.name,x
+
++ ldx this.name
+  ldy this.name+2
+  rep #$31
+  pla
+  sta this.name+2
+  pla
+  sta this.name
+  rts
+
+
+  CLASS Player.nameInput getName getScreenBuffer
+.ends	
+	

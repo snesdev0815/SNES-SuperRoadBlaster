@@ -1,0 +1,230 @@
+/**
+* oam manager.
+*
+
+sprite format, oamram
+  byte OBJ*4+0: xxxxxxxx
+  byte OBJ*4+1: yyyyyyyy
+  byte OBJ*4+2: cccccccc
+  byte OBJ*4+3: vhoopppN
+*/
+
+
+.include "src/core/oam.h"
+.section "oamManager"
+
+
+/**
+*
+*/
+core.oam.init:
+  php
+  rep #$31
+  stz.w GLOBAL.currentOamSlot
+  sep #$20
+  stz.w GLOBAL.oamUploadFlag
+  stz.w GLOBAL.oamClearFlag
+
+  jsr core.oam.clearTable
+
+/*
+  ;allocate intial sprite memory for nametable in vram
+  rep #$31
+  lda.w #SPRITE.NAMETABLE.GRANULARITY
+  ldy.w #SPRITE.NAMETABLE.PRIMER
+  ldx.w #SPRITE.TILE.GRANULARITY
+  
+  jsr core.vram.allocate
+  bcs +
+	pei (SPRITE.TILE.GRANULARITY)
+    TRIGGER_ERROR E_OutOfVram
+
+
++ stx.w GLOBAL.oam.vram.start
+  sep #$20
+  sta.w GLOBAL.oam.vram.id
+*/
+  stz.w GLOBAL.oam.vram.id
+  lda.w MainScreen
+  ora.b #T_OBJ_ENABLE
+  sta.w MainScreen
+
+/*
+  rep #$31
+  ;set nametable1, 2, sprite size
+  lda.w GLOBAL.oam.vram.start
+  rol a
+  rol a
+  rol a
+  sta.w ObjSel
+*/
+  plp
+  rts
+
+oamClearWord:
+  .dw 0
+
+core.oam.clearAll:
+  ;clear oam table buffer in ram
+  php
+  sep #$20
+  lda #WRAM.CLEAR_PATTERN.OAM
+  ldy.w #OAM.GLOBAL.END - OAM.GLOBAL.START
+  ldx.w #OAM.GLOBAL.START
+  jsr ClearWRAM
+  plp
+  rts
+
+
+/**
+* clear oam table buffer in ram & initate upload
+*/
+core.oam.play:
+  php
+  sep #$20
+  lda.w GLOBAL.oamUploadFlag
+  beq +
+	rep #$31
+	lda.w #WRAM.CLEAR_PATTERN.OAM
+	ldy.w #GLOBAL.oamBuffer.end - GLOBAL.oamBuffer
+	ldx.w #GLOBAL.oamBuffer
+	jsr ClearWRAM
+
+	sep #$20
+	tsx
+	lda #DMA_TRANSFER.OAM		;transfer type
+	pha
+	pea GLOBAL.oamBuffer	;source adress
+	;lda #:GLOBAL.oamBuffer		;source bank
+	lda #RAM	;@fixme, this is a hack. must find out why above returns $00 instead of $7e
+	pha
+	pea OAM.TABLE.0.START	;target
+	pea OAM.TABLE.0.LENGTH	;length
+
+	jsr core.dma.registerTransfer
+	
+      ;dummy write for priority rotation
+/*
+      rep #$31
+      lda.w #WRAM.CLEAR_PATTERN.OAM
+      ldy.w #GLOBAL.oamBuffer.end - GLOBAL.oamBuffer
+      ldx.w #GLOBAL.oamBuffer
+      jsr ClearWRAM
+
+      sep #$20
+*/      
+/*
+      lda #DMA_TRANSFER.OAM       ;transfer type
+      pha
+      pea GLOBAL.oamBuffer & $ffff + (127 * 4)    ;source adress
+      ;lda #:GLOBAL.oamBuffer     ;source bank
+      lda #RAM    ;@fixme, this is a hack. must find out why above returns $00 instead of $7e
+      pha
+      pea 127/2 | (OAMADDH_PRIORITY_ACTIVATE << 8)   ;target, set priority to last sprite
+      pea 4  ;length
+
+      jsr core.dma.registerTransfer
+*/
+	txs
+
++ stz.w GLOBAL.oamUploadFlag
+  rep #$31
+  stz.w GLOBAL.currentOamSlot
+  plp
+  rts
+
+core.oam.clearTable:
+  php
+  sep #$20
+  jsr core.oam.clearAll
+  ;clear oam table
+  tsx
+  lda #DMA_TRANSFER.OAM | DMA_TRANSFER.OPTION.FIXED_SOURCE		;transfer type
+  pha
+  pea oamClearWord	;source adress
+  lda #:oamClearWord		;source bank
+  pha
+  pea OAM.TABLE.0.START	;target
+  pea OAM.TABLE.0.LENGTH + OAM.TABLE.1.LENGTH	;length
+
+  jsr core.dma.registerTransfer
+  txs
+
+  plp
+  rts  
+
+
+/**
+* get allocated memory adress for nametable. If none present yet, allocate some
+*/
+core.oam.getNametableBase:
+  php
+  rep #$31
+  lda.w GLOBAL.oam.vram.id
+  and.w #$ff
+  bne _allocatedOk
+
+	lda.w #SPRITE.TILE.GRANULARITY
+	ldy.w #SPRITE.NAMETABLE.PRIMER
+	ldx.w #SPRITE.TILE.GRANULARITY
+	
+	jsr core.vram.allocate
+	bcs +
+	  pea SPRITE.TILE.GRANULARITY
+      TRIGGER_ERROR E_OutOfVram
+
+
++	stx.w GLOBAL.oam.vram.start
+	sep #$20
+	sta.w GLOBAL.oam.vram.id
+	rep #$31
+	txa
+	and.w #$C000
+	sta.w GLOBAL.oam.vram.start
+	rol a
+	rol a
+	rol a
+
+	;second name table is +$2000 bytes
+	;@fixme, select correct upper nametable
+	sep #$20
+	ora.b #OBJSEL_NAME_1
+	sta.w ObjSel
+
+_allocatedOk:
+  ldy.w GLOBAL.oam.vram.start
+  plp
+
+  rts
+
+/*
+  ;allocate intial sprite memory for nametable in vram
+  rep #$31
+  lda.w #SPRITE.NAMETABLE.GRANULARITY
+  ldy.w #SPRITE.NAMETABLE.PRIMER
+  ldx.w #SPRITE.TILE.GRANULARITY
+  
+  jsr core.vram.allocate
+  bcs +
+	pei (SPRITE.TILE.GRANULARITY)
+    TRIGGER_ERROR E_OutOfVram
+
+
++ stx.w GLOBAL.oam.vram.start
+  sep #$20
+  sta.w GLOBAL.oam.vram.id
+*/
+  lda.w MainScreen
+  ora.b #T_OBJ_ENABLE
+  sta.w MainScreen
+
+/*
+  rep #$31
+  ;set nametable1, 2, sprite size
+  lda.w GLOBAL.oam.vram.start
+  rol a
+  rol a
+  rol a
+  sta.w ObjSel
+*/
+.ends

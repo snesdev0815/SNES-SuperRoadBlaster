@@ -1,0 +1,72 @@
+/**
+* hdma object that masks garbled screen borders of video playback
+* 
+*/
+.include "src/object/hdma/videoMask.h"
+.section "VideoMask"
+
+  /**
+   * @param a<bool> pal/ntsc select (pal needs a bigger mask because vblank is shorter)
+   */
+  METHOD init
+  rep #$31
+  and #$ff
+  tay
+  sep #$20
+  ldx #VideoMaskTable.ntsc
+  lda #:VideoMaskTable.ntsc
+  cpy #0
+  beq +
+    ldx #VideoMaskTable.pal
+    lda #:VideoMaskTable.pal
++  
+  jsr abstract.Hdma.setTableAdress
+
+  lda hdma.flags
+  ora #DMAP_2_REG_WRITE_ONCE
+  sta hdma.flags
+
+  ;buffer changed regs
+  lda.w window12Sel
+  sta this.buffer.window12Sel
+  lda.w windowObjSel
+  sta this.buffer.windowObjSel
+  lda.w windowMainscreen
+  sta this.buffer.windowMainscreen
+
+  ;enable window masking on bg1,2, backdrop color, color window
+  lda #(W12SEL_BG2_W1_ENABLE | W12SEL_BG1_W1_ENABLE)
+  sta.w window12Sel
+
+  lda #(WOBJSEL_COL_W1_ENABLE | WOBJSEL_COL_W1_ENABLE)
+  sta.w windowObjSel
+
+  lda #(T_BG2_ENABLE | T_BG1_ENABLE)
+  sta.w windowMainscreen
+
+  lda #W1L & $ff
+  sta hdma.target
+
+  jsr abstract.Hdma.start
+  rts
+
+
+  METHOD kill
+  sep #$20
+  ;revert changed registers
+  lda this.buffer.window12Sel
+  sta.w window12Sel
+  lda this.buffer.windowObjSel  
+  sta.w windowObjSel
+  lda this.buffer.windowMainscreen
+  sta.w windowMainscreen
+
+  rep #$31
+  jsr abstract.Hdma.stop
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+  CLASS VideoMask
+.ends	
+	

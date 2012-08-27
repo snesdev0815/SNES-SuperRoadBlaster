@@ -1,0 +1,83 @@
+/**
+* palette rotator
+*/
+.include "src/object/palette/Palette.rotate.h"
+.section "Palette.rotate"
+
+  /**
+  * @param arg.1 <int, 16bit>    color start id
+  * @param arg.2 <int, 16bit>    color count
+  * @param arg.3 <int, 16bit>    delay (0=fastest)
+  * @param arg.4 <int, 16bit>    decay rate (0=none)
+  */
+  METHOD init
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  sta palette.color.start
+  lda OBJECT.CALL.ARG.2,s
+  sta palette.color.length
+;  inc a
+;  inc a
+  sta this.counter
+  lda OBJECT.CALL.ARG.3,s
+  stz this.delay
+  lda OBJECT.CALL.ARG.4,s
+  stz this.decay
+  inc this.inited
+  jsr abstract.Palette.init
+  rts
+
+;bad col: 0xdb07
+
+  /**
+  *
+  */
+  METHOD play
+  rep #$31
+
+;wait a frame to make sure palette has been uploaded properly
+  lda this.inited
+  bne +
+    dec this.counter
+    bmi _kill
+    jsr _rotatePalette
+    jsr abstract.Palette.flush
++
+  stz this.inited
+  rts
+
+_rotatePalette:
+  php
+  rep #$31
+  ;get pointer into ram buffer
+  ldx.b palette.ramBuffer.start
+
+  lda.w GLOBAL.wramBuffer.start,x   ;buffer first entry
+  pha
+
+  ldy.b palette.color.length
+  dey
+  
+-   lda.w (GLOBAL.wramBuffer.start & $ffff +2),x
+    sta.w GLOBAL.wramBuffer.start,x
+    inx
+    inx
+    dey
+    bne -
+
+  pla
+  sta.w GLOBAL.wramBuffer.start,x   ;write last entry
+
+  plp
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr abstract.Palette.deallocate
+  lda #OBJR_kill
+  sta 3,s   
+  rts
+
+  CLASS Palette.rotate
+.ends	
+	

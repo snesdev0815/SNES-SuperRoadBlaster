@@ -1,0 +1,182 @@
+/**
+* hdma object that masks garbled screen borders of video playback
+* 
+*/
+.include "src/object/hdma/logoZoom.h"
+.section "hdma.logoZoom"
+
+/**
+* @param 1 <int, 8bit> target layer (0-3)
+*/
+  METHOD init
+  sep #$20
+
+  lda OBJECT.CALL.ARG.1,s
+  cmp.b #BG.LAYER.3 + 1
+  bcc +
+	pha
+    TRIGGER_ERROR E_BadBgLayer
+
++
+  asl a
+  clc
+  adc #BG1VOFS & $ff
+  sta hdma.target
+
+  rep #$31
+  lda #LOGO_ZOOM.TABLE.LENGTH
+  sta hdma.ramBuffer.length
+  jsr abstract.Hdma.allocateBuffer
+
+
+  lda.w #GLOBAL.wramBuffer.start
+  clc
+  adc hdma.ramBuffer.start
+  tax
+  sep #$20
+  lda #RAM
+  jsr abstract.Hdma.setTableAdress
+
+  lda hdma.flags
+  ora #DMAP_1_REG_WRITE_TWICE
+  sta hdma.flags
+
+  jsr _initTable
+  jsr abstract.Hdma.start
+  rts
+
+  METHOD play
+  jsr _updateTable
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr abstract.Hdma.stop
+  jsr abstract.Hdma.deallocateBuffer
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+_updateTable:
+  php
+  rep #$31
+  pha
+  lda this.tablePointer
+  sta 1,s
+  asl a
+  clc
+  adc 1,s
+  clc
+  adc hdma.ramBuffer.start
+  clc
+  adc #GLOBAL.wramBuffer.start
+  tax
+  lda #RAM
+  jsr abstract.Hdma.setTableAdress
+  jsr abstract.Hdma.makePhysical
+
+  inc this.tablePointer
+  lda this.tablePointer
+  cmp #$c0
+  bne +
+	CALL LogoZoom.kill.MTD iterator.self
++
+  pla
+  plp
+  rts
+
+_initTable:
+  php
+  rep #$31
+  lda.w #$dd
+  sta this.tablePointer
+  lda.w #$30
+  sta this.lutPointer
+  lda #$2a0
+  clc
+  adc hdma.ramBuffer.start
+  sta this.tableEnd
+  ldx hdma.ramBuffer.start
+
+-	lda #1
+	sta.w GLOBAL.wramBuffer.start,x
+	inx
+
+	phx
+	lda this.lutPointer
+	and.w #$3f
+	tax
+	lda.l logoZoomInitLUT,x
+	plx
+
+	clc
+	adc this.tablePointer
+	sta.w GLOBAL.wramBuffer.start,x
+
+	inc this.lutPointer
+	dec this.tablePointer
+	inx
+	inx
+	cpx this.tableEnd
+	bne -
+
+  ;terminate table
+  stz.w GLOBAL.wramBuffer.start,x
+  stz this.tablePointer
+/*
+stolen from battletoads double dragon
+97c8aa lda #$00e9             A:caeb X:0000 Y:03de S:01fb D:0000 DB:97 NvmxdIzc V:175 H: 240
+97c8ad sta $c2       [0000c2] A:00e9 X:0000 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 258
+97c8af stz $c4       [0000c4] A:00e9 X:0000 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 286
+97c8b1 lda #$ff00             A:00e9 X:0000 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 314
+97c8b4 sta $c6       [0000c6] A:ff00 X:0000 Y:03de S:01fb D:0000 DB:97 NvmxdIzc V:175 H: 332
+97c8b6 stz $c8       [0000c8] A:ff00 X:0000 Y:03de S:01fb D:0000 DB:97 NvmxdIzc V:175 H: 360
+97c8b8 lda #$0030             A:ff00 X:0000 Y:03de S:01fb D:0000 DB:97 NvmxdIzc V:175 H: 388
+97c8bb sta $d6       [0000d6] A:0030 X:0000 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 406
+97c8bd ldx #$0000             A:0030 X:0000 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 434
+
+;init table loop
+97c8c0 lda #$0001             A:0030 X:0000 Y:03de S:01fb D:0000 DB:97 nvmxdIZc V:175 H: 452
+97c8c3 sta $05c4,x   [9705c4] A:0001 X:0000 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 470
+97c8c6 inx                    A:0001 X:0000 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 510
+97c8c7 lda $e0       [0000e0] A:0001 X:0001 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 522
+97c8c9 beq $c8d4     [97c8d4] A:caeb X:0001 Y:03de S:01fb D:0000 DB:97 NvmxdIzc V:175 H: 590
+  97c8cb lda $d6       [0000d6] A:caeb X:0001 Y:03de S:01fb D:0000 DB:97 NvmxdIzc V:175 H: 602
+  97c8cd and #$003f             A:0030 X:0001 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 630
+  97c8d0 tay                    A:0030 X:0001 Y:03de S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 648
+  97c8d1 lda $c418,y   [97c448] A:0030 X:0001 Y:0030 S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 660
+
+97c8d4 clc                    A:0201 X:0001 Y:0030 S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 696
+97c8d5 adc $c2       [0000c2] A:0201 X:0001 Y:0030 S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 708
+97c8d7 sta $05c4,x   [9705c5] A:02ea X:0001 Y:0030 S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 736
+97c8da inc $d6       [0000d6] A:02ea X:0001 Y:0030 S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 776
+97c8dc dec $c2       [0000c2] A:02ea X:0001 Y:0030 S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 826
+97c8de inx                    A:02ea X:0001 Y:0030 S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 876
+97c8df inx                    A:02ea X:0002 Y:0030 S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 888
+97c8e0 cpx #$02a0             A:02ea X:0003 Y:0030 S:01fb D:0000 DB:97 nvmxdIzc V:175 H: 900
+97c8e3 bne $c8c0     [97c8c0] A:02ea X:0003 Y:0030 S:01fb D:0000 DB:97 NvmxdIzc V:175 H: 918
+
+results in:
+0097:05c4  01 ea 02 01 ea 02 01 e9 03 01 e9 04 01 e9 04 01
+0097:05d4  e8 05 01 e8 06 01 e8 06 01 e7 07 01 e7 07 01 e6
+0097:05e4  07 01 e5 08 01 e5 08 01 e4 08 01 e3 08 01 e2 68
+0097:05f4  01 e1 08 01 e0 08 01 df 08 01 de 07 01 dc 07 01
+0097:0604  db 07 01 da 06 01 d8 06 01 d7 05 01 d5 04 01 d3
+0097:0614  04 01 d2 03 01 d0 02 01 ce 02 01 cd 01 01 cb 00
+0097:0624  01 c9 ff 01 c7 ff 01 c5 ff 01 c4 fe 01 c2 fd 01
+0097:0634  c0 fd 01 bf fc 01 bd fb 01 bb fb 01 ba fa 01 b8
+0097:0644  fa 01 b7 fa 01 b6 f9 01 b4 f9 01 b3 f9 01 b2 f9
+0097:0654  01 b1 f9 01 b0 f9 01 af fa 01 af fa 01 ae fa 01
+0097:0664  ad fb 01 ad fb 01 ac fc 01 ac fd 01 ac fd 01 ab
+0097:0674  fe 01 ab ff 01 ab ff 01 aa 00 01 aa 01 01 aa 01
+0097:0684  01 aa 02 01 aa 02 01 a9 03 01 a9 04 01 a9 04 01
+0097:0694  a8 05 01 a8 06 01 a8 06 01 a7 07 01 a7 07 01 a6
+0097:06a4  07 01 a5 08 01 a5 08 01 a4 08 01 a3 08 01 a2 68
+0097:06b4  01 a1 08 01 a0 08 01 9f 08 01 9e 07 01 9c 07 01
+*/
+  plp
+  rts
+  
+  CLASS LogoZoom
+.ends	
+	

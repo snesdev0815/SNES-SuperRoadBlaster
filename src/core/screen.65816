@@ -1,0 +1,187 @@
+/**
+* screen manager.
+*
+* Just provides current screen dimensions and unified means to convert absolute to screen coordinates
+*
+*  -max dimensions for one "level" are $ffff x $ffff, so screen cant use full 16bit-range, but rather $ffff-screenx x $ffff-screeny
+*
+*  -routines:
+*	-screen.getPosition
+*	-screen.getSize
+*	-screen.convertAbsoluteToScreen
+*	  -takes absolute position, converts it to screen coordinate(so that objects can check if they're onscreen and have their sprites converted to screen coordinates to be able to write oamram list)
+*	  -tells if position is on screen(carry set if yes)
+*/
+
+
+.include "src/core/screen.h"
+.section "screenManager"
+
+
+/**
+*
+*/
+core.screen.init:
+  php
+  rep #$31
+  stz.w GLOBAL.screen.position.x
+  stz.w GLOBAL.screen.position.y
+  lda.w #SCREEN.DEFAULT.SIZE.X
+  clc
+  adc.w GLOBAL.screen.position.x
+  sta.w GLOBAL.screen.size.x
+  lda.w #SCREEN.DEFAULT.SIZE.Y
+  clc
+  adc.w GLOBAL.screen.position.y
+  sta.w GLOBAL.screen.size.y
+  plp
+  rts
+
+/**
+* get position of upper left corner of screen
+*
+* @return x<int, 16bit>	current x-pos
+* @return y<int, 16bit>	current y-pos
+*/
+screen.getPosition:
+  php
+  rep #$31
+  ldx.w GLOBAL.screen.position.x
+  ldy.w GLOBAL.screen.position.y
+  plp
+  rts
+
+/**
+* get size of screen
+*
+* @return x<int, 16bit>	horizontal size
+* @return y<int, 16bit>	vertical size
+*/
+core.screen.getSize:
+  php
+  rep #$31
+  ldx.w GLOBAL.screen.size.x
+  ldy.w GLOBAL.screen.size.y
+  plp
+  rts
+
+
+/**
+* convert absolute position to screen-relative position
+*
+* useful to check if object(sprite, bg) is onscreen and to convert 
+*
+* @param x<int, 16bit> absolute x-position
+* @param y<int, 16bit> absolute y-position
+*
+* @return x<int, 16bit>	screen-relative x-position
+* @return y<int, 16bit>	screen-relative y-position
+* @return c	true if position is on screen
+*/
+core.screen.convertAbsoluteToScreen:
+  php
+  rep #$31
+  pha
+  cpx.w GLOBAL.screen.position.x
+  bcc +
+
+  cpy.w GLOBAL.screen.position.y
+  bcc +
+
+  txa
+  sta 1,s
+  lda.w GLOBAL.screen.position.x
+  clc
+  adc.w GLOBAL.screen.size.x
+  cmp 1,s
+  bcc +
+
+  tya
+  sta 1,s
+  lda.w GLOBAL.screen.position.y
+  clc
+  adc.w GLOBAL.screen.size.y
+  cmp 1,s
+  bcc +
+
+  ;position is onscreen, convert to screen-relative
+  txa
+  sec
+  sbc.w GLOBAL.screen.position.x
+  tax
+
+  tya
+  sec
+  sbc.w GLOBAL.screen.position.y
+  tay
+
+  pla
+  plp
+  sec
+  rts
+
+;outsideScreen:
++ pla
+  plp
+  clc
+  rts
+
+
+/**
+* check if position is on screen
+*
+* useful to check if object(sprite, bg) is onscreen and to convert 
+*
+* @param x<int, 16bit> absolute x-position
+* @param y<int, 16bit> absolute y-position
+*
+* @return x<int, 16bit>	screen-relative x-position
+* @return y<int, 16bit>	screen-relative y-position
+* @return c	true if position is on screen
+*/
+core.screen.checkIfOnScreen:
+;  pha
+  cpx.w GLOBAL.screen.position.x
+  bcc +
+
+  cpx.w GLOBAL.screen.size.x
+  bcs +
+
+  cpy.w GLOBAL.screen.position.y
+  bcc +
+
+  cpy.w GLOBAL.screen.size.y
+  bcs +
+
+core.screen.getPosition:
+  .accu 16
+  .index 16
+  ldx.w GLOBAL.screen.position.x
+  ldy.w GLOBAL.screen.position.y
+  rts
+/*
+  txa
+  sta 1,s
+  lda.w GLOBAL.screen.position.x
+  clc
+  adc.w GLOBAL.screen.size.x
+  cmp 1,s
+  bcc +
+
+  tya
+  sta 1,s
+  lda.w GLOBAL.screen.position.y
+  clc
+  adc.w GLOBAL.screen.size.y
+  cmp 1,s
+  bcc +
+*/
+;  pla
+  sec
+  rts
+
++; pla
+  clc
+  rts
+
+.ends

@@ -1,0 +1,100 @@
+/*
+* part of a crude, hardcoded interface model
+*
+*/
+
+;zp-vars
+.enum 0
+  _iterator INSTANCEOF iteratorStruct
+  _dimension INSTANCEOF dimensionStruct
+.ende
+
+.section "interface.dimension"
+/*
+* set pixel position of object
+*/
+interface.dimension.setPosition:
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  stz.b _dimension.position.x
+  sta.b _dimension.position.x + 1
+
+  stz.b _dimension.position.y
+  lda OBJECT.CALL.ARG.2,s
+  sta.b _dimension.position.y + 1
+  rts
+
+
+/*
+* get pixel position of object
+*/
+interface.dimension.getPosition:
+  php
+  rep #$31
+  ldx.b _dimension.position.x + 1
+  ldy.b _dimension.position.y + 1
+  plp
+  rts
+
+/*
+* get pixel size of object
+*/
+interface.dimension.getSize:
+  php
+  rep #$31
+  ldx.b _dimension.size.x
+  ldy.b _dimension.size.y
+  plp
+  rts
+
+/*
+* move object with subpixel accuracy
+*
+* param 1 <int, 16bit>  ;x-axis translation value
+* param 2 <int, 16bit>  ;y-axis translation value
+*/
+interface.dimension.translate:
+  rep #$31
+  lda OBJECT.CALL.ARG.2,s
+  beq ++
+  
+  adc.b _dimension.position.y
+  sta.b _dimension.position.y
+
+  bcc +
+    lda OBJECT.CALL.ARG.2,s
+    bmi ++
+      sep #$20
+      inc.b _dimension.position.y + 2
+      bra ++
++
+    lda OBJECT.CALL.ARG.2,s
+    bpl ++
+      sep #$20
+      dec.b _dimension.position.y + 2
+
+++
+  rep #$31
+  lda OBJECT.CALL.ARG.1,s
+  beq ++
+  
+  adc.b _dimension.position.x
+  sta.b _dimension.position.x
+  lda.b _dimension.position.x + 2
+
+  bcc +
+    lda OBJECT.CALL.ARG.1,s
+    bmi ++
+      sep #$20
+      inc.b _dimension.position.x + 2
+      bra ++
++
+    lda OBJECT.CALL.ARG.1,s
+    bpl ++
+      sep #$20
+      dec.b _dimension.position.x + 2
+
+++
+  rts
+
+.ends

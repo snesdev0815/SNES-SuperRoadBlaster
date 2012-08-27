@@ -1,0 +1,144 @@
+
+	SCRIPT hall_of_fame
+.ACCU 16
+.INDEX 16
+
+  .def objBackground2 hashPtr.1
+  .def objFameText hashPtr.2
+  .def objFameBrightness hashPtr.3
+  .def objMsu1 hashPtr.4
+  .def irq.buffer.x this._tmp
+  .def irq.buffer.y this._tmp + 2
+
+
+  NEW Brightness.CLS.PTR objFameBrightness
+
+  lda #BRIGHTNESS.NONE
+  CALL Brightness.set.MTD objFameBrightness 
+
+  lda.w #OBJECT.PROPERTIES.isChapter
+  jsr abstract.Iterator.setProperties
+  jsr abstract.Iterator.killOthers
+
+  lda.w #OBJECT.PROPERTIES.isEvent
+  jsr abstract.Iterator.kill.byProperties
+
+  lda.w #OBJID.Msu1
+  jsr abstract.Iterator.kill.byId
+
+  NEW Msu1.audio.CLS.PTR objMsu1
+
+  lda.w #1
+  CALL Msu1.audio.playAudio.MTD objMsu1
+
+  sep #$20
+  lda.b #BGMODE_MODE_1 | BGMODE_PRIORITY_LAYER_3
+  sta.w ScreenMode
+  lda.w MainScreen
+  and.b #(T_BG1_ENABLE | T_BG2_ENABLE | T_BG3_ENABLE | T_BG4_ENABLE) ~$ff
+  sta.w MainScreen
+  rep #$31
+
+  NEW Background.textlayer.16x16.CLS.PTR objFameText
+  NEW Background.generic.CLS.PTR objBackground2 BG.LAYER.0 BG.hiscore.PTR
+
+
+  lda #OBJID.Score
+  ldx #sort.score.score
+  jsr abstract.Sort.byId
+
+  lda #T_hallOfFame.PTR
+  CALL Background.textlayer.16x16.print.MTD objFameText
+
+  jsr abstract.Iterator.reset
+
+  ;init score
+  pea 0
+  ;init name
+  pea 0
+  pea 0
+  ;init highscorelist-position
+  pea 0
+
+-	lda #OBJID.Score
+	jsr abstract.Iterator.each.byId
+	bcc +
+
+	CALL Score.getScore.MTD iterator.target
+	sta 7,s
+
+	CALL Score.getName.MTD iterator.target
+	sta 3,s
+	txa
+	sta 5,s
+
+
+	lda 1,s
+
+	inc a
+	sta 1,s
+
+	lda #T_highScore.PTR
+
+	CALL Background.textlayer.16x16.print.MTD objFameText
+
+	bra -
+
++
+
+  pla
+  pla
+  pla
+  pla
+
+  CALL Background.textlayer.16x16.flush.MTD objFameText
+
+  lda #BRIGHTNESS.FULL
+  CALL Brightness.fadeTo.MTD objFameBrightness 
+
+  jsr core.irq.position.get
+  stx irq.buffer.x
+  sty irq.buffer.y
+
+  ldy #213
+  jsr core.irq.position.set
+
+  jsr SavePC
+
+  CALL Msu1.audio.isDone.MTD objMsu1
+  bcc +
+	bra _exit
++
+  ldx #INPUT.DEVICE.ID.0
+  jsr core.input.get.trigger
+  and.w #(JOY_BUTTON_A | JOY_BUTTON_START)
+  beq +
+
+_exit:
+  lda #BRIGHTNESS.NONE
+  CALL Brightness.fadeTo.MTD objFameBrightness
+
+  jsr SavePC
+  CALL Brightness.isDone.MTD objFameBrightness
+
+  bcs +++
+    rts
++++
+
+  CALL Background.generic.kill.MTD objBackground2
+  CALL Background.textlayer.16x16.kill.MTD objFameText
+  CALL Msu1.audio.kill.MTD objMsu1
+
+  lda.w #OBJECT.PROPERTIES.isHdma
+  jsr abstract.Iterator.kill.byProperties
+
+  ldx irq.buffer.x
+  ldy irq.buffer.y
+  jsr core.irq.position.set
+
+  NEW Script.CLS.PTR oopCreateNoPtr msu1
++ 
+
+  rts
+
+

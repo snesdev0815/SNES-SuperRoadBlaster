@@ -1,0 +1,183 @@
+/**
+* object bubble sorter, built upon iterator structure.
+*
+* sorts objects byProperty or byId according to one of their word-sized zero-page variables
+* warning: currently objects are sorted while executing object methods! This means that you must make sure sort doesnt get called on objects that are currently executing(self or any object in caller chain of self)!
+* warning: will reset Iterator counter
+*
+* -first, we determine the amount of matching objects to get required loop count
+* 	-there, we also push all the found targets on the stack
+*/
+
+
+.include "src/object/sort/abstract.Sort.h"
+.section "sort"
+
+  METHOD init
+  METHOD play
+  METHOD kill
+  rep #$31
+  TRIGGER_ERROR E_abstractClass
+  rts
+
+
+/**
+* searches for next object matching requested properties. if found, writes target object hash to iterator.target of callee
+*
+* @param a<int, 8bit>	target object id (@see OBJID.[]). Object must satisfy requested id to trigger match
+* @param x <int, 16bit>	lower byte: direct-page variable word to compare against. msb=reverse order if set
+*/
+abstract.Sort.byId:
+  php
+  rep #$31
+  stx iterator.sort.key
+  sta iterator.sort.target
+  
+  tsx
+  
+  ;find all matching objects and put them on the stack
+  jsr abstract.Iterator.reset
+-	lda iterator.sort.target
+	jsr abstract.Iterator.each.byId
+	pei (iterator.target+2)
+	pei (iterator.target)
+	bcs -
+
+  pla   ;last push was redundant
+  pla
+  
+  ;get bytelength of pushed objects
+  phx
+  lda iterator.count
+  cmp #2
+  bcc _exit
+/*  
+	asl a
+	asl a
+	sta iterator.sort.count*/
+
+/*
+c0a5bd pei ($06)     [7e133a] A:003a X:18c0 Y:0000 S:189a D:0472 DB:7e nvmxdizC V:  6 H:1032
+c0a5bb pei ($08)     [7e0130] A:003a X:18c0 Y:0000 S:189c D:0472 DB:7e nvmxdizC V:  6 H: 978
+ */
+    sta iterator.sort.count
+--
+      tsx
+      ldy #1
+
+        ;loop through all pushed objects, compare two at a time
+-	  
+        lda.w 3,x
+        sta iterator.sort.second
+        inx
+        inx
+        lda.w 3,x
+        sta iterator.sort.second+2
+
+        inx
+        inx
+        lda.w 3,x
+        sta iterator.sort.first
+        inx
+        inx
+        lda.w 3,x
+        sta iterator.sort.first+2
+        dex
+        dex
+
+        
+        jsr _compareSwap
+        /*tya
+        clc
+        adc #8
+        tay*/
+        iny
+        cpy iterator.sort.count
+        bcc -
+
+	  dec iterator.sort.count
+	  bne --
+	  
+_exit:
+  plx
+  txs
+
+  plp
+  rts
+
+/**
+ * compare key variables (treated as unsigned 16bit int) of two objects in object stack, swap objects if first is bigger.
+ * 
+ */
+_compareSwap:
+  .accu 16
+  .index 16
+  phx
+  phy
+  ldx iterator.sort.first+2
+  jsr _getKeyValue
+  pha
+  
+  ldx iterator.sort.second+2
+  jsr _getKeyValue
+  cmp 1,s
+  bcc +
+    
+    ldx iterator.sort.first+2
+    ldy iterator.sort.second+2
+    jsr _swapObjects
+    
+    
++ pla
+  ply
+  plx
+  rts
+
+/**
+ * swap two objects in object stack
+ * 
+ * @param x <int, 16bit>    ;pointer to first object in object stack
+ * @param y <int, 16bit>    ;pointer to second object in object stack
+ */
+_swapObjects:
+  .accu 16
+  .index 16
+  pea oopStackObj.length
+-
+    lda.w OopStack,x
+    pha
+    lda.w OopStack,y
+    sta.w OopStack,x
+    pla
+    sta.w OopStack,y
+    inx
+    inx
+    iny
+    iny
+    lda 1,s
+    dec a
+    dec a
+    sta 1,s
+    bne -
+  pla
+  rts
+
+/**
+ * get value of key variable in object zp-area
+ * 
+ * @param x <int, 16bit>    ;pointer to object in object stack, usually fetched from object hash
+ * @return a <int, 16bit>   ;word value of key variable
+ */
+_getKeyValue:
+  .accu 16
+  .index 16
+  lda.l OopStack.dp,x
+  clc
+  adc.b iterator.sort.key   ;no boundary checking here! If variable key adress is > objects zp-page, this might spill over into other objects!
+  tay
+  lda.w 0,y ;get 16bit key
+  rts
+  
+  
+  CLASS abstract.Sort
+.ends

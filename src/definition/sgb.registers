@@ -1,0 +1,36 @@
+.define SGB_LY_COUNTER		$6000			;gb display v-line counter
+.define SGB_VRAM_UNKNOWN	$6001			;unknown
+.define SGB_CMD_FLAG		$6002			;bit0 set if command ready to be read
+	.define SGB_CMD_FLAG_IS_READY	1 << 0
+
+.define SGB_CONTROL			$6003			;global control reg
+	.define SGB_CONTROL_RESET_DMG	1 << 7
+	.define SGB_CONTROL_4_PLAYER	1 << 5
+	.define SGB_CONTROL_2_PLAYER	1 << 4
+	.define SGB_CONTROL_CLK_DASH	0 << 0
+	.define SGB_CONTROL_CLK_NORMAL	1 << 0
+	.define SGB_CONTROL_CLK_SLOW	2 << 0
+	.define SGB_CONTROL_CLK_XSLOW	3 << 0
+
+.define SGB_JOYPAD_1		$6004
+	.define SGB_JOYPAD_START		1 << 7
+	.define SGB_JOYPAD_SELECT		1 << 6
+	.define SGB_JOYPAD_B			1 << 5
+	.define SGB_JOYPAD_A			1 << 4
+	.define SGB_JOYPAD_DOWN			1 << 3
+	.define SGB_JOYPAD_UP			1 << 2
+	.define SGB_JOYPAD_LEFT			1 << 1
+	.define SGB_JOYPAD_RIGHT		1 << 0
+
+.define SGB_JOYPAD_2		$6005
+.define SGB_JOYPAD_3		$6006
+.define SGB_JOYPAD_4		$6007
+.define SGB_VERSION			$600f
+	.define SGB_VERSION_HORI	$21
+	.define SGB_VERSION_RICOH	$61
+.define SGB_CMD_DATA_PORT	$7000
+.define SGB_VRAM_DATA_PORT	$7800
+
+.define SGB_MAX_COMMANDS 		6
+.define SGB_COMMAND_BLOCK_SIZE	16
+.define SGB_BUFFER_FILLED		$f1

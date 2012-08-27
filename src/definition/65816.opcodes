@@ -1,0 +1,9 @@
+;65816 opcodes for self-modifying code
+
+.define OPCODE_LDA_IMMEDIATE	$a9						;lda #$1234
+.define OPCODE_BRA				$80						;bra $12
+.define OPCODE_JMP				$4c						;jmp $1234
+.define OPCODE_INC_DP			$e6						;inc $12
+.define OPCODE_DEC_DP			$c6						;dec $12
+.define OPCODE_NOP				$ea						;nop
+.define OPCODE_PEA				$f4						;pea $1234

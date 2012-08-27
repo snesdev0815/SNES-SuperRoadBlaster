@@ -1,0 +1,136 @@
+/**
+* highscore display for hall of fame
+* 
+*/
+.include "src/object/background/Background.textlayer.8x8.h"
+.section "Background.textlayer.8x8"
+
+  METHOD init
+  rep #$31
+
+  jsr _allocateMemory
+
+  jsr _uploadFont
+
+;  jsr _printHighscores
+  jsr core.string.reset
+  jsr _stringToTilemap
+  jsr abstract.Background.uploadTilemap
+
+  lda.b this.bg
+  jsr abstract.Background.makePhysical
+
+  rts
+
+_allocateMemory:
+  php
+  sep #$20
+  lda #BG.LAYER.2
+  sta.b this.bg
+
+  lda.b #PALETTE.BPP.2
+  sta animation.tiles.bpp
+
+  rep #$31
+  lda.w #ExcFontTiles.LEN
+  sta animation.tiles.length
+  lda.w #ExcFontPal.LEN
+  sta animation.palette.length
+  lda.w #TILEMAP.SIZE.SINGLE
+  sta animation.tilemap.length
+  sta animation.frame.tilemap.length
+
+  jsr abstract.Background.allocateMemory
+
+  plp
+  rts
+
+_uploadFont:
+  php
+  sep #$20
+  tsx
+  lda #DMA_TRANSFER.VRAM	;transfer type
+  pha
+  pea ExcFontTiles
+  lda.b #:ExcFontTiles		;source bank
+  pha
+  rep #$31
+
+  pei (animation.tiles.start)
+  pea ExcFontTiles.LEN
+
+  jsr core.dma.registerTransfer
+
+;  tsx
+
+  sep #$20
+  lda #DMA_TRANSFER.CGRAM	;transfer type
+  pha
+;  phy
+  pea ExcFontPal
+  lda.b #:ExcFontPal		;source bank
+  pha
+  rep #$31
+
+  pei (animation.palette.start)
+  pea ExcFontPal.LEN
+
+  jsr core.dma.registerTransfer
+;  txs
+  txs
+  plp
+  rts
+
+_stringToTilemap:
+  php
+  rep #$31
+
+  ldx #0
+  ldy animation.ramBuffer.start
+
+;GLOBAL.CORE.STRING.buffer.length
+-	lda.w GLOBAL.CORE.STRING.buffer,x
+	and.w #$ff
+	sec
+	sbc.w #$20	;shift back, whitespace starts at char 0 instead of $20
+	ora.w #BG.FORMAT.PRIORITY	;set priority
+	sta.w GLOBAL.wramBuffer.start,y
+	inx
+	iny
+	iny
+	cpx.w #GLOBAL.CORE.STRING.buffer.length
+	bne -
+
+  plp
+  rts
+
+  METHOD play
+;  jsr abstract.Background.playAnimation
+  rts
+
+  METHOD kill
+  rep #$31
+  jsr abstract.Background.deallocate
+  lda #OBJR_kill
+  sta 3,s	
+  rts
+
+  METHOD clear
+  rep #$31
+  jsr core.string.reset
+  rts
+
+  METHOD print
+  rep #$31
+  jsr core.string.parse_from_object
+  rts
+
+  METHOD flush
+  rep #$31
+  jsr _stringToTilemap
+  jsr abstract.Background.uploadTilemap
+  rts
+
+  CLASS Background.textlayer.8x8 clear print flush
+.ends	
+	

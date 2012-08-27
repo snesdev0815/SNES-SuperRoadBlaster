@@ -1,0 +1,124 @@
+/**
+* abstract Palette methods
+*
+*/
+
+
+.include "src/object/palette/abstract.Palette.h"
+.section "abstract.Palette"
+
+  METHOD init
+  METHOD play
+  METHOD kill
+  rep #$31
+  TRIGGER_ERROR E_abstractClass
+  rts
+
+/**
+* pull designated palette from cgram into wram buffer. If you call this in your objects init routine, it should be ready by the time its play routine is executed for the first time
+*/
+abstract.Palette.init:
+  php
+  rep #$31
+  ;allocate wram buffer for palette
+  lda.b palette.color.length
+  asl a
+  tax
+  stx.b palette.ramBuffer.length
+
+  jsr core.wram.allocate
+  bcs +
+	  pei (palette.ramBuffer.length)
+      TRIGGER_ERROR E_OutOfWram
+
++ stx.b palette.ramBuffer.start
+  sep #$20
+  sta.b palette.ramBuffer.id
+
+;fetch current palette from CGRAM
+  jsr _fetchPalette
+  plp
+  rts
+
+
+_fetchPalette:
+  php
+  rep #$31
+  tsx
+  lda.w #GLOBAL.wramBuffer.start
+  clc
+  adc.b palette.ramBuffer.start
+  tay
+
+  sep #$20
+  lda #(DMA_TRANSFER.CGRAM | DMA_TRANSFER.OPTION.REVERSE)   ;transfer type
+  pha
+  phy
+  ;wla dx is too fucking stupid to correctly calculate ramsection bank despite spitting out correct adress in symbol file!
+  ;lda.b #:GLOBAL.wramAllocationBlocks      ;source bank
+  lda.b #RAM        ;source bank
+
+  pha
+  rep #$31
+  lda palette.color.start
+  asl a
+  pha
+  ;pei (palette.ramBuffer.start) ;fixme, this is bogus!
+  pei (palette.ramBuffer.length)
+
+  jsr core.dma.registerTransfer
+  txs
+  plp
+  rts
+/**
+* upload palette from buffer to cgram
+*/
+abstract.Palette.flush:
+  php
+  rep #$31
+  tsx
+  lda.w #GLOBAL.wramBuffer.start
+  clc
+  adc.b palette.ramBuffer.start
+  tay
+
+  sep #$20
+  lda #DMA_TRANSFER.CGRAM   ;transfer type
+  pha
+  phy
+  ;wla dx is too fucking stupid to correctly calculate ramsection bank despite spitting out correct adress in symbol file!
+  ;lda.b #:GLOBAL.wramAllocationBlocks      ;source bank
+  lda.b #RAM        ;source bank
+
+  pha
+  rep #$31
+  lda palette.color.start
+  asl a
+  pha
+  ;pei (palette.ramBuffer.start) ;fixme, this is bogus!
+  pei (palette.ramBuffer.length)
+
+  jsr core.dma.registerTransfer
+  txs
+  plp
+  rts
+
+
+
+/**
+*
+*/
+abstract.Palette.deallocate:
+  php
+  sep #$20
+  lda.b palette.ramBuffer.id
+  beq +
+    jsr core.wram.deallocate
++
+  plp
+  rts
+
+
+  CLASS abstract.Palette
+
+.ends

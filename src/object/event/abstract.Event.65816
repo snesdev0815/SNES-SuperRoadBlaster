@@ -1,0 +1,97 @@
+/**
+* just a little object to automatically test core functionality
+* 
+*/
+.include "src/object/event/abstract.Event.h"
+.section "abstract.Event"
+
+  METHOD init
+  METHOD play
+  METHOD kill
+  rep #$31
+  TRIGGER_ERROR E_abstractClass
+  rts
+
+/**
+* triggers result if frame reached.
+*
+* @return c<bool>	set if result was triggered
+*/
+abstract.Event.checkResult:
+  rep #$31
+  lda.b event.endFrame
+  jsr GLOBAL.checkFrameReached
+  bcc +
+  	jsr abstract.Event.triggerResult
+	sec
++ rts
+
+abstract.Event.triggerResult:
+	ldx.b event.result
+	lda.l (BSL << 16),x
+	cmp #RESULT_MAGIC
+	beq +
+	  phx
+      TRIGGER_ERROR E_BadEventResult
+
+
++	pea _return-1	;push return adress
+	inx
+	phx		;push target subroutine adress. next rts is abused to actually do a jump to subroutine
+
+_return:
+  rts
+
+;chapter results, trigger some action, then kill self.
+EventResult.none:
+  .dw RESULT_MAGIC
+  CALL abstract.Event.kill.MTD iterator.self
+  rts
+
+
+EventResult.playchapter:
+  .dw RESULT_MAGIC
+  pei (event.resultTarget)
+  NEW Script.CLS.PTR oopCreateNoPtr
+  pla
+  rts
+
+
+EventResult.restartchapter:
+  .dw RESULT_MAGIC
+  pei (event.chapterId)
+  NEW Script.CLS.PTR oopCreateNoPtr
+  pla
+  rts
+
+
+EventResult.lastcheckpoint:
+  .dw RESULT_MAGIC
+  ;seek current chapter, get init adress
+  CALL Player.loseLife.MTD event.player
+  bcc +
+	pea game_over
+	NEW Script.CLS.PTR oopCreateNoPtr
+	pla
+	rts
++
+  jsr abstract.Iterator.reset
+  lda.w #OBJECT.PROPERTIES.isCheckpoint
+  jsr abstract.Iterator.each.byProperties
+  bcs +
+	;error, no chapter found!
+    TRIGGER_ERROR E_NoCheckpointFound
+
++ CALL Event.checkpoint.getCheckpointAdress.MTD iterator.target
+  ;use return adress of checkpoint as new target script adress
+  pha
+  NEW Script.CLS.PTR oopCreateNoPtr
+  pla
+  ;also show life counter once for good measure
+  NEW Sprite.life_car.CLS.PTR oopCreateNoPtr 195 20 SPRITE.LIFE_COUNTER.MAX_AGE
+  NEW Sprite.life_counter.CLS.PTR oopCreateNoPtr 220 20 SPRITE.LIFE_COUNTER.MAX_AGE
+  rts
+
+  CLASS abstract.Event
+.ends	
+	
