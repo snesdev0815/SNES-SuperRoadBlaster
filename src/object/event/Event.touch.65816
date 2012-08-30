@@ -1,5 +1,4 @@
 /**
-* just a little object to automatically test core functionality
 * 
 */
 .include "src/object/event/Event.touch.h"

@@ -1,5 +1,6 @@
 
-	SCRIPT score_entry
+  SCRIPT score_entry
+
 .ACCU 16
 .INDEX 16
 
@@ -78,7 +79,7 @@
   beq +
     rts
 +
-  ;pea currentScore
+
   CALL Player.getScore.MTD objPlayer
   pha
 
@@ -88,8 +89,7 @@
   lda #T_scoreEntryName.PTR
 
   CALL Background.textlayer.16x16.print.MTD objFameText
-  ;hack
-  ;jsr core.string.parse
+
   pla
   pla
   pla

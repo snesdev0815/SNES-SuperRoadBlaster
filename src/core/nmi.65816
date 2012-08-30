@@ -1,6 +1,5 @@
 ;this nmi uses a maximum of 20 scanlines while streaming brr frames to the spc
 .include "src/core/nmi.h"
-;.include "routines/joypadread.asm"
 .section "nmi"
 
 core.nmi.play:
@@ -24,8 +23,6 @@ core.nmi.play:
 
     lda.w GLOBAL.HDMA.CHANNEL.ENABLE        ;check which hdma channels need to be activated
     sta.l HDMAEN        ;set hdma channels and disable dma channel
-
-;	jsr core.nmi.stop
 
 	rep #$31
 	inc.w FrameCounter
@@ -128,27 +125,7 @@ core.nmi.play:
     lda.w GLOBAL.interruptFlags
     sta.l NMITIMEN
 
-	;process dma queue, but force blank before doing so.
-;	sep #$20
-    
-/*
-	lda.b #INIDSP_FORCE_BLANK
-	sta.l INIDSP
-	jsr core.dma.processQueue
-
-	lda.w ScreenBrightness
-	and.b #INIDSP_FORCE_BLANK ~$ff
-	sta.l INIDSP
-*/
 	rep #$39
-/*
-    lda.l GLOBAL.irq.ypos
-    sta.l VTIMEL
-
-    lda.l GLOBAL.irq.xpos
-    sta.l HTIMEL
-*/
-;    jsr core.nmi.start
 
 	ply
 	plx
@@ -175,16 +152,12 @@ core.nmi.init:
 	sta.w GLOBAL.interruptFlags
 
 	sta.l NMITIMEN
-	;lda.w SetIni			;set display mode
-    ;lda #SETINI_OVERSCAN
     lda #0
 	sta.l SETINI			;dont set this during nmi cause if the overscan flag is changed mid-nmi, it might result in screw ups with the nmi timing
 
 	lda.l RDNMI	;pull up nmi line
 	lda.l TIMEUP	;pull up irq line
 
-	;lda #$ff
-	;sta.w ScreenBrightness
 	stz.w ScreenBrightness
 
 	plp

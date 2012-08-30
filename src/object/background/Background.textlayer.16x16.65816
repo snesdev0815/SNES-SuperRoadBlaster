@@ -1,5 +1,4 @@
 /**
-* highscore display for hall of fame
 * 
 */
 .include "src/object/background/Background.textlayer.16x16.h"
@@ -12,7 +11,6 @@
 
   jsr _uploadFont
 
-;  jsr _printHighscores
   jsr core.string.reset
   jsr _stringToTilemap
   jsr abstract.Background.uploadTilemap
@@ -61,12 +59,9 @@ _uploadFont:
 
   jsr core.dma.registerTransfer
 
-;  tsx
-
   sep #$20
   lda #DMA_TRANSFER.CGRAM	;transfer type
   pha
-;  phy
   pea Font16x16Pal
   lda.b #:Font16x16Pal		;source bank
   pha
@@ -76,7 +71,7 @@ _uploadFont:
   pea Font16x16Pal.LEN
 
   jsr core.dma.registerTransfer
-;  txs
+
   txs
   plp
   rts
@@ -88,9 +83,6 @@ _stringToTilemap:
   ldx #0
   ldy animation.ramBuffer.start
 
-  ;pha
-  
-;GLOBAL.CORE.STRING.buffer.length
 -	lda.w GLOBAL.CORE.STRING.buffer,x
 	and.w #$ff
 	sec
@@ -98,19 +90,13 @@ _stringToTilemap:
     asl a   ;double width
     asl a   ;double height
 	ora.w #BG.FORMAT.PRIORITY	;set priority
-    ;sta 1,s
+
 
 	sta.w GLOBAL.wramBuffer.start,y
     inc a
     sta.w (GLOBAL.wramBuffer.start & $ffff) +2,y
 	inc a
-	/*
-	;super bad hack!!
-    lda 1,s
-    clc
-	adc.w #((Font16x16Tiles.LEN/32)/4)*2    ;assume that font consists of 2 4bpp-tile-rows
-	;adc.w #96*2
-	*/
+
     sta.w (GLOBAL.wramBuffer.start & $ffff)+(32*2),y  ;write to tilemap line below
     inc a
     sta.w (GLOBAL.wramBuffer.start & $ffff)+(32*2)+2,y
@@ -132,12 +118,10 @@ _stringToTilemap:
 	cpx.w #GLOBAL.CORE.STRING.buffer.length
 	bne -
 
-;  pla
   plp
   rts
 
   METHOD play
-;  jsr abstract.Background.playAnimation
   rts
 
   METHOD kill

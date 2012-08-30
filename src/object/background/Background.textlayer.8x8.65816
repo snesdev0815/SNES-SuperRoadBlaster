@@ -1,5 +1,4 @@
 /**
-* highscore display for hall of fame
 * 
 */
 .include "src/object/background/Background.textlayer.8x8.h"
@@ -12,7 +11,6 @@
 
   jsr _uploadFont
 
-;  jsr _printHighscores
   jsr core.string.reset
   jsr _stringToTilemap
   jsr abstract.Background.uploadTilemap
@@ -61,12 +59,10 @@ _uploadFont:
 
   jsr core.dma.registerTransfer
 
-;  tsx
-
   sep #$20
   lda #DMA_TRANSFER.CGRAM	;transfer type
   pha
-;  phy
+
   pea ExcFontPal
   lda.b #:ExcFontPal		;source bank
   pha
@@ -76,7 +72,7 @@ _uploadFont:
   pea ExcFontPal.LEN
 
   jsr core.dma.registerTransfer
-;  txs
+
   txs
   plp
   rts
@@ -88,7 +84,6 @@ _stringToTilemap:
   ldx #0
   ldy animation.ramBuffer.start
 
-;GLOBAL.CORE.STRING.buffer.length
 -	lda.w GLOBAL.CORE.STRING.buffer,x
 	and.w #$ff
 	sec
@@ -105,7 +100,6 @@ _stringToTilemap:
   rts
 
   METHOD play
-;  jsr abstract.Background.playAnimation
   rts
 
   METHOD kill

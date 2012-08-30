@@ -1,5 +1,4 @@
 /**
-* just a little object to automatically test core functionality
 * 
 */
 .include "src/object/event/Event.chapter.h"
@@ -24,9 +23,6 @@
   ;kill all pending events except self
   jsr abstract.Iterator.killOthers
 
-  /*;kill sprites if there are any left
-  lda.w #OBJECT.PROPERTIES.isSprite
-  jsr abstract.Iterator.kill.byProperties*/
   ;dont kill hud sprites, just move offscreen
   jsr abstract.Iterator.reset
 -  
@@ -44,7 +40,6 @@
   lda #BRIGHTNESS.FULL
   CALL Brightness.fadeTo.MTD this.brightness
 
-
   NEW Msu1.CLS.PTR event.msu1Handler
 
   lda.b event.chapterId
@@ -54,7 +49,6 @@
   lda this.hasDash
   beq +
 	NEW SteeringWheel.CLS.PTR this.sprite.steeringWheel 21 112
-    ;NEW Dashboard.CLS.PTR this.sprite.dashboard 0 20
     NEW Background.dashboard.CLS.PTR this.bg.dashboard 0 128
     rts
 +
@@ -71,29 +65,6 @@
 
   METHOD kill
   rep #$31
-  lda this.hasDash
-  beq +  
-/*
-	;loop over all dash elements, move down
-	jsr abstract.Iterator.reset
-
--		lda.w #OBJECT.PROPERTIES.isDash
-		jsr abstract.Iterator.each.byProperties
-		bcc +
-		  CALL Dashboard.kill.MTD iterator.target
-		  bra -
-*/
-    ;dont kill, these should be persistent
-	;appears to fail sometimes
-    ;CALL Dashboard.kill.MTD this.sprite.dashboard
-	;CALL SteeringWheel.kill.MTD this.sprite.steeringWheel
-	;CALL Background.dashboard.kill.MTD this.bg.dashboard
-
-+
-/*  ;kill all pending events. this would cause trouble if we'd ever have multiple chapters running at the same time
-  lda.w #OBJECT.PROPERTIES.isEvent
-  jsr abstract.Iterator.kill.byProperties*/
-
   lda #OBJR_kill
   sta 3,s	
   rts

@@ -30,18 +30,7 @@ core.random.get:
 	lda.w GLOBAL.random3
 	clc
 	adc.w GLOBAL.random4
-/*
-	clc
-	eor.w JoyPortBuffer&$ffff			;use button presses for rng aswell
-	eor.w JoyPortBuffer&$ffff+2
-	eor.w JoyPortBuffer&$ffff+4
-	eor.w JoyPortBuffer&$ffff+6
-	eor.w JoyPortBuffer&$ffff+8
-	eor.w JoyPortBuffer&$ffff+10
-	eor.w JoyPortBuffer&$ffff+12
-	eor.w JoyPortBuffer&$ffff+14
-	eor.w FrameCounter
-*/
+
 	sta.w GLOBAL.random1
 
 	plp
@@ -51,7 +40,6 @@ core.random.get:
 	clc
 	adc.w GLOBAL.random4
 	clc
-;	eor.w JoyPortBuffer&$ffff+8
 	eor.w FrameCounter
 
 	sta.w GLOBAL.random1

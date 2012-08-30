@@ -1,12 +1,6 @@
 .include "src/config/config.inc"
 
-/*
-.ramsection "oop obj ram zp" bank 0 slot 2
 
-.ends
-*/
-
-;@todo, this is obsolete. should be merged with regular animation stuff
 .struct backgroundStruct
   _tmp ds 8
   bpp	db
@@ -40,10 +34,4 @@
 
 .base BSL
 .bank 0 slot 0
-
-
-
-/*.section "backgroundDat"
-	OOPOBJ Background $81 zpLen setX setY getAllocatedMemory
-.ends*/
 

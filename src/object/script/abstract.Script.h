@@ -3,7 +3,6 @@
 ;zp-vars
 .enum 0
   iterator INSTANCEOF iteratorStruct
-;  event INSTANCEOF eventStruct
   script INSTANCEOF scriptStruct
   this INSTANCEOF scriptStruct
   zpLen ds 0

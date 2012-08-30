@@ -4,11 +4,7 @@
 there is no dedicated script language, just assembler simplified by general macros.
 the main difference between regular objects and scripts is that scripts halt/save/continue each frame, which makes waiting for events much easier.
 
-have:
--a dedicated script zp space for obj hash pointers
--a script kill routine that acts as garbage collector and tries to delete all objs that are found in script obj hash pointers(except for sigletons)
--an obj-flag that indicates persistency(unkillable by kill routine; nmi/spc handler etc, basically most singletons)
--all luts should be placed in header files, superfree where possible
+
 */
 
 
@@ -175,7 +171,6 @@ WaitReturn:
 ;script obj kill routine, for external calls
   METHOD kill
 	rep #$31
-	;jsr _collectGarbage
 	lda #OBJR_kill	;lastly, kill script instance itself
 	sta 3,s	
 	rts
@@ -191,12 +186,6 @@ terminateScript:
         TRIGGER_ERROR E_ScriptStackTrash
 
 _terminateScriptStackOk:
-	;jsr _collectGarbage
-/*	tsc
-	clc
-	adc #8	;two RTLs from script, two RTS from script dispatcher
-	tcs */
-
 	lda #OBJR_kill	;lastly, kill script instance itself
 	sta 5,s	
 	rts

@@ -2,30 +2,6 @@
 	
 .section "textstrings" superfree
 
-/*
-T_EXCP_exception:
-	.db TC_pos
-	.dw $42
-	.db TC_sub
-	.dw T_EXCP_starLine.PTR
-	.db "a fatal error has occured!",TC_brk
-	.db TC_sub
-	.dw T_EXCP_starLine.PTR
-	.db "error-message:"
-	.db TC_pos
-	.dw $182
-	.db TC_sub
-	.dw T_EXCP_starLine.PTR
-	.db TC_sub
-	.dw T_EXCP_cpuInfo.PTR
-	.db TC_sub
-	.dw T_EXCP_starLine.PTR
-	.db TC_brk
-	.db "Found a bug?",TC_brk
-	.db "Please report to:",TC_brk
-	.db "matt@dforce3000.de"
-	.db TC_end
-*/
 
 T_EXCP_exception:
     .db TC_pos

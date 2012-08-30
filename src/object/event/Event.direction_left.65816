@@ -1,5 +1,4 @@
 /**
-* just a little object to automatically test core functionality
 * 
 */
 .include "src/object/event/Event.direction_left.h"
@@ -22,7 +21,6 @@
   lda event.endFrame  
   CALL Left_arrow.reset.MTD this.sprite 60 80
 
-  ;NEW Player.CLS.PTR event.player
   NEW Spc.CLS.PTR this.audio
   lda.w #SAMPLE.0.TURN
   CALL Spc.SpcPlaySoundEffect.MTD this.audio
@@ -49,8 +47,6 @@
   jsr core.input.get.press
   and.w #JOY_DIR_LEFT
   beq +
-      /*lda.w #SAMPLE.0.OK
-      CALL Spc.SpcPlaySoundEffect.MTD this.audio*/
 
       jsr core.input.get.trigger
       and.w #JOY_DIR_LEFT
@@ -64,7 +60,6 @@
       lda #PLAYER.BONUS.DEFAULT
 +++
 	NEW Sprite.score.CLS.PTR oopCreateNoPtr 60 80
-	;CALL Player.addToScore.MTD event.player
     CALL Event.confirm.kill.MTD iterator.self
 	rts
 
@@ -76,7 +71,6 @@
 
   METHOD kill
   rep #$31
-  ;CALL Right_arrow.kill.MTD this.sprite
   lda #OBJR_kill
   sta 3,s	
   rts

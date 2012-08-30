@@ -198,7 +198,6 @@ _frameCycleLUT24fpsNTSC:
   .dw _uploadFirstChunk
   .dw _uploadSecondChunk
   .dw _resetFrameCycle
-  ;.dw _ntscSucks
 
 
 ;24fps 2:3 pulldown pal
@@ -271,13 +270,6 @@ _uploadFirstChunk:
       TRIGGER_ERROR E_Msu1FrameBad
 	
 +
-
-/*
-  ;commenting out below lines works sort of, but causes illegal dma transfers sometimes
-  lda.b this.currentFrame
-  jsr _msu1SeekToFrame
-*/
-
   jsr _msu1SetupFrameLength
 
   ;toggle between framebuffers
@@ -332,8 +324,6 @@ _uploadFirstChunk:
   plx
   pha
 
-;  pei (this.tilesLength)
-  
   ;check if tile transfer has to be splitted between two frames
   stz.b this.tileTransferRemainder
   
@@ -345,23 +335,9 @@ _uploadFirstChunk:
     lda.w #MSU1_MAX_TILE_TRANSFER_LENGTH
 + sta.b this.tileTransferRemainder
   pha
-  
-/*  
-  lda.b this.tilesLength
-  cmp.w #MSU1_MAX_TILE_TRANSFER_LENGTH
-  bcc +
-	sec
-	sbc.w #MSU1_MAX_TILE_TRANSFER_LENGTH
-	sta.b this.tileTransferRemainder
-	lda.w #MSU1_MAX_TILE_TRANSFER_LENGTH
 
-+ pha
-*/
-  ;never register empty transfer
-;  sec
-  ;beq +
-    jsr core.dma.registerTransfer
-+    
+  jsr core.dma.registerTransfer
+
   txs
   bcs +
     TRIGGER_ERROR E_DmaQueueFull
@@ -436,11 +412,10 @@ _uploadSecondChunk:
 	ldx.b this.framebuffer.current.pointer
 	lda.b this.framebuffer.1.tiles,x
 	clc
-	;adc.w #MSU1_MAX_TILE_TRANSFER_LENGTH
+
 	adc.b this.tileTransferRemainder
 	plx
 	pha
-;	pei (this.tileTransferRemainder)
 
     lda this.tileTransferRemainder
     cmp.w #MSU1_MAX_TILE_TRANSFER_LENGTH
@@ -456,8 +431,6 @@ _uploadSecondChunk:
 
 + ;transfer palette
   tsx
-  ;this does not work because second tile chunk and palette are uploaded on the same frame, you can't change adress in between
-  ;jsr _msu1SeekToCurrentFramePalette
   sep #$20
   lda #DMA_TRANSFER.CGRAM | DMA_TRANSFER.OPTION.FIXED_SOURCE		;transfer type
   pha
@@ -480,14 +453,9 @@ _uploadSecondChunk:
     TRIGGER_ERROR E_DmaQueueFull
 
 +
-  ;hacky crap: dont update frame counter if we're just finishing current framecycle
-;  lda.b this.videoPlaying
-  ;and.w #TRUE
-;  beq +
-	jsr _incrementFrame
+  jsr _incrementFrame
 
   ;toggle layers
-;+
   lda.w MainScreen
   bit.w #(T_BG1_ENABLE | T_BG2_ENABLE)
   bne +
@@ -495,9 +463,6 @@ _uploadSecondChunk:
 
 + eor.w #T_BG1_ENABLE | T_BG2_ENABLE
   sta.w MainScreen
-
-;  lda #CGWSEL_CLIP_COL_INSIDE
-;  sta.w colorAdditionSelect
 
   lda #FALSE
   sta this.frameBusy
@@ -513,20 +478,16 @@ _incrementFrame:
   cmp.b this.frameCount
   bcc +
 	;chapter complete
-	/*lda.b this.currentChapter
-	inc a
-	jsr _playVideo*/
 	jsr _stop
 	lda.b this.currentFrame
 	jsr _msu1SeekToFrame
-
-	;rts
 
 + sta.b this.currentFrame
   sta.w GLOBAL.currentFrame
 
   plp
   rts
+  
 /**
 * repeat cycle
 */
@@ -628,8 +589,6 @@ _msu1SeekToCurrentFramePalette:
   adc.w #0
   sta 1,s
 
-;  pei (this.tmp)
-  ;pei (this.tmp+2)
   jsr _msu1SetAdress
   txs
   plp
@@ -782,7 +741,7 @@ _delay:
   rep #$31
   stz.b this.currentFrame
   stz.w GLOBAL.currentFrame
-;  jsr _stopVideo
+
   plp
   rts
 
@@ -818,24 +777,12 @@ _startNextVideo:
 
   lda.b #TRUE
   sta.b this.videoPlaying
-  ;sta.w GLOBAL.videoPlaying
 
-/*  lda.w MainScreen
-  and.b #(T_BG1_ENABLE | T_BG2_ENABLE) ~$ff
-  sta.w MainScreen*/
-
-;  lda #CGWSEL_CLIP_COL_ALWAYS
-;  sta.w colorAdditionSelect
-
-  ;jsr _resetFrameCycle
   lda.b this.currentChapter
   jsr _playAudio
 
   rep #$31
   stz.b this.currentFrame
-  ;stz.b this.framebuffer.current.pointer
-  
-  ;lda #0
   stz.w GLOBAL.currentFrame
 
   lda.b this.currentFrame
@@ -852,7 +799,7 @@ _startNextVideo:
 
   stz.w GLOBAL.currentFrame
   stz.b this.videoPlaying
-  ;stz.w GLOBAL.videoPlaying
+
   jsr _stopAudioTrack
   plp
   rts
@@ -967,16 +914,7 @@ _msu1SetAdress:
 	beq _msu1SetAdressTimeout
 	lda.l MSU_STATUS
 	bmi -
-/*
-  ;artificial wait
-  ldx.w #MSU1_SEEK_TIMEOUT
--   dex
-    nop
-    nop
-    nop
-    nop
-	bne -
-*/
+
   plx
   plp
   rts
@@ -1044,14 +982,6 @@ _stopAudioTrack:
   sta.l MSU_CONTROL
   jsr _waitAudioBusy
 
-  /* @todo
-  ;check if msu1 actually stopped playing
-  lda.l MSU_STATUS
-  and.b #MSU_STATUS_AUDIO_PLAY
-  bne _msu1playAudioError
-  */
-
-
   plp
   rts
 
@@ -1118,7 +1048,6 @@ _waitAudioBusy:
   ldx.w #MSU1_SEEK_TIMEOUT
 
 -	dex
-;	beq _msu1playAudioTimeout
 	lda.l MSU_STATUS
 	and.b #MSU_STATUS_AUDIO_BUSY
 	bne -
@@ -1135,20 +1064,8 @@ _waitAudioBusy:
 GLOBAL.checkFrameReached:
   rep #$31
   pha
-/*
-  lda.w GLOBAL.videoPlaying
-  and.w #TRUE
-;  bne +
-	clc
-	pla
-	rts
 
-+
-*/
   lda.w GLOBAL.currentFrame
-  ;stupid, stupid hack because suddenly, some chapters in the msu1 file are missing a frame or two, wtf ????
-  ;inc a
-  ;inc a
   cmp 1,s
 
   pla

@@ -4,14 +4,6 @@
 .Section "Main Code"
 core.boot.init:
 	sep #$20
-/*
-;debug, prime WRAM to find uninitialized variable reads
-    ldx #0
--     lda #$ff
-      sta $7e0000,x
-      inx
-      bne -
-*/    
 
 	lda #RAM
 	pha

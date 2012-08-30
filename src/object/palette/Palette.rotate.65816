@@ -16,8 +16,6 @@
   sta palette.color.start
   lda OBJECT.CALL.ARG.2,s
   sta palette.color.length
-;  inc a
-;  inc a
   sta this.counter
   lda OBJECT.CALL.ARG.3,s
   stz this.delay
@@ -27,7 +25,6 @@
   jsr abstract.Palette.init
   rts
 
-;bad col: 0xdb07
 
   /**
   *

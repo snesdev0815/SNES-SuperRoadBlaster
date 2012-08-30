@@ -168,13 +168,7 @@ allocateVramSeekFreeBlocks:
   sta.w GLOBAL.vramAllocation.temp.start
   xba			;allocatio blocksize: $100
   and.w #$ff
-  /*lsr a		;allocation blocksize: $80
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a*/
+
   tay
 
 allocateVramSeekLoop:
@@ -198,13 +192,7 @@ allocateVramSeekLoop:
 
 +
 	sta.w GLOBAL.vramAllocation.temp.start
-	/*lsr a		;allocation blocksize : $80
-	lsr a
-	lsr a
-	lsr a
-	lsr a
-	lsr a
-	lsr a*/
+
 	xba			;allocation blocksize : $100
 	and.w #$ff
 	cmp.w #VRAM_ALLOCATION_BLOCKS
@@ -250,28 +238,11 @@ markAllocatedVramBlocks:
   pha
 
   lda.w GLOBAL.vramAllocation.temp.start
-  /*lsr a		;allocation blocksize : $80
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a*/
+
   xba			;allocation blocksize : $100
   and.w #$ff
   tay
 
-/*
-  ;$100 byte blocks
-  lda.w GLOBAL.vramAllocation.input.length
-  xba
-  ;half-occupied blocks present? will occupy full block
-  bit.w #$ff00
-  beq +
-	inc a
-
-+ and.w #$ff
-*/
   ;$80 byte blocks
   lda.w GLOBAL.vramAllocation.input.length
   ;half-occupied blocks present? will occupy full block
@@ -280,14 +251,8 @@ markAllocatedVramBlocks:
 	clc
 	adc.w #VRAM_ALLOCATION_BLOCKSIZE
 
-+ /*lsr a		;allocation blocksize : $80
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a*/
-  xba			;allocatio blocksize: $100
++
+  xba			;allocation blocksize: $100
   and.w #$ff
   tax
   pla
@@ -325,8 +290,6 @@ core.vram.deallocate:
 	  stz.w GLOBAL.vramAllocationBlocks,x
 +	dex
 	bpl -
-;	cpx.w #$ffff
-;	bne -
 
   rep #$31
   tax

@@ -63,28 +63,6 @@ ClearWRAM:
 	plb
 	pla
 
-;don't use dma transfer from rom if executing from wram
-;.if BSL == RAM2
-.if 1 == 1
-/*	REP #$31		; mem/A = 8 bit, X/Y = 16 bit   
-	and.w #$7	;calculate adress of clear pattern word(8 entries max)
-	asl a
-	adc.w #ClearWramBytePatterns
-	sta tmp
-	SEP #$20
-
-	lda #:ClearWramBytePatterns
-	sta tmp+2
-
-	rep #$31
-	tya
-	and.w #$fffe         ;word-align counter
-	tay
-	phy
-	ldy.w #0
-	lda [tmp],y
-	ply*/
-
     rep #$31
     phx
     and.w #$7   ;calculate adress of clear pattern word(8 entries max)
@@ -102,30 +80,6 @@ ClearWRAMLoop:
 		dey
 		bne ClearWRAMLoop
 
-.else
-	rep #$31		; mem/A = 8 bit, X/Y = 16 bit
-	and.w #$7	;calculate adress of clear pattern word(8 entries max)
-	asl a
-	adc.w #ClearWramBytePatterns
-	sta.w DMASRC0L	;dma source
-
-	sep #$20
-	lda.b #:ClearWramBytePatterns
-	sta DMASRC0B         ;Set source bank to $00
-
-	stx.w WMADDL	;store target wram adress in bank $7e
-	stz.w WMADDH	;bank $7e
-
-	lda #DMAP_FIXED_TRANSFER | DMAP_1_REG_WRITE_TWICE
-	sta DMAP0         ;Set DMA mode to fixed source, WORD to WMDATA
-	lda #WMDATA & $ff
-	sta DMADEST0
-
-	sty.w DMALEN0L         ;Set transfer size
-	lda #DMA_CHANNEL0_ENABLE
-	sta MDMAEN         ;Initiate transfer
-
-.endif
 	plb
 	plp
 	ply

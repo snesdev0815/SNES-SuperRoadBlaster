@@ -166,13 +166,7 @@ core.irq.play:
     plb
     plb
 
-    ;jsr _switchDashboard
-	;bra _detectedUnhandledIrq
-
     jsr core.nmi.stop
-/*    sep #$20
-    lda #0
-    sta.l NMITIMEN*/
 
     ;jump to registered callback if valid
     rep #$31
@@ -199,11 +193,9 @@ core.irq.play:
 _return:
 
 
-    ;jsr _switchDashboard
     jsr core.nmi.start
     sep #$20
-/*    lda.w GLOBAL.interruptFlags
-    sta.l NMITIMEN*/
+
     lda.l TIMEUP
     rep #$39
 
@@ -217,7 +209,7 @@ _return:
 _detectedUnhandledIrq:
   TRIGGER_ERROR E_UnhandledIrq
 
-
+/*
 ;quick & dirty hack
 _switchDashboard:
   
@@ -255,6 +247,6 @@ _switchDashboard:
 
   plp
   rts
-	
+*/	
 .ends
 

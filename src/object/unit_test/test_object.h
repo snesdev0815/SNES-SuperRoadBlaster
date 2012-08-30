@@ -15,9 +15,6 @@
 
 .base BSL
 .bank 0 slot 0
-/*.section "unit_test_obj"
-	OOPOBJ Test_object $81 zpLen testParameterReturn
-.ends*/
 
 
 

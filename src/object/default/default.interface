@@ -20,25 +20,4 @@ interface.default.kill:
 	rts
 
 .ends
-/*
-.ifndef __init
-  .define __init
-  _init:
-	rts
-.endif
 
-.ifndef __play
-  .define __play
-  _play:
-	rts
-.endif
-
-.ifndef __kill
-  .define __kill
-  _kill:
-	rep #$31
-	lda #OBJR_kill
-	sta 3,s  
-	rts
-.endif
-*/

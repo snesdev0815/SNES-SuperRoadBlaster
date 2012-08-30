@@ -1,5 +1,4 @@
 /**
-* just a little object to automatically test core functionality
 * 
 */
 .include "src/object/event/Event.confirm.h"
@@ -22,15 +21,7 @@
 
   METHOD play
   rep #$31
-/*
-  ;CALL Msu1.getCurrentFrame.MTD event.msu1Handler
-  ;cmp.b event.endFrame
-  lda.b event.endFrame
-  jsr GLOBAL.checkFrameReached
-  bcc +
-	CALL Event.confirm.kill.MTD iterator.self
-+
-*/
+
   ;load new chapter script if start/a has been pressed
   ldx #INPUT.DEVICE.ID.0
   jsr core.input.get.trigger

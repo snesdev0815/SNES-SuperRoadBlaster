@@ -18,7 +18,6 @@
 ;zp-vars
 .enum 0
   iterator INSTANCEOF iteratorStruct
-;  event INSTANCEOF eventStruct
   script INSTANCEOF scriptStruct
   this INSTANCEOF vars
   hashPtr INSTANCEOF oopObjHash NumOfHashptr  
@@ -31,28 +30,9 @@
 .define CLASS.PROPERTIES OBJECT.PROPERTIES.isScript
 .define CLASS.ZP_LENGTH zpLen
 
-/*
-.ramsection "selfmod jsl" bank 0 slot 1
-SelfModJSL	ds 5	;used for selfmodifying jumps, jsl + rtl
-.ends
-*/
 
 .base BSL
 .bank 0 slot 0
-/*.section "script obj"
-	OOPOBJ Script $80 zpLen
-.ends*/
-
-/*
-.section "script LUT" superfree
-scriptLUT:
-	PTRNORM scriptLUT bootstrap
-;	PTRNORM scriptLUT level1_crash1
-;	PTRNORM scriptLUT level1_crash13
-
-scriptLUTEnd:
-.ends
-*/
 
 .section "scripts"
 

@@ -108,8 +108,6 @@ core.dma.registerTransfer:
   ldy.w #DMA_QUEUE_SLOTS
 
 ;seek free queue slot
-/*-	lda.w ((GLOBAL.dmaQueue.1.transferType - 1)&$ffff),x
-	bpl +*/
 -	lda.w GLOBAL.dmaQueue.1.transferType,x
 	bit.w #DMA_TRANSFER.OPTION.ACTIVE
 	beq +
@@ -175,8 +173,7 @@ core.dma.isQueueEmpty:
   lda.w GLOBAL.currentDmaQueueSlot
   and.w #(DMA_QUEUE_SLOTS * _sizeof_dmaQueue) - 1
   tax
-/*  lda.w ((GLOBAL.dmaQueue.1.transferType - 1)&$ffff),x
-  bmi +*/
+  
   lda.w GLOBAL.dmaQueue.1.transferType,x
   bit.w #DMA_TRANSFER.OPTION.ACTIVE
   bne +
@@ -218,8 +215,7 @@ dmaQueueLoop:
       TRIGGER_ERROR E_InvalidDmaTransferType
 
 
-+	/*lda.w GLOBAL.dmaQueue.1.transferType,x
-	and.w #(DMA_TRANSFER.OPTION.FIXED_SOURCE | DMA_TRANSFER.OPTION.ACTIVE) ~$ff*/
++
 	asl a
 	phx
 	txy
@@ -243,8 +239,6 @@ doneProcessingQueue:
   rts
 
 dmaQueueVramTransfer:
-;  php
-;  rep #$31
   ldx.w GLOBAL.dmaQueueChannel.index
   
   lda.w GLOBAL.dmaQueue.1.sourceAdress,y
@@ -273,14 +267,10 @@ dmaQueueVramTransfer:
   sta.l MDMAEN
  
   rep #$31
-;  plp
   rts
 
 
 dmaQueueOamTransfer:
-;  php
-;  rep #$31
-
   ldx.w GLOBAL.dmaQueueChannel.index
   
   lda.w GLOBAL.dmaQueue.1.sourceAdress,y
@@ -305,13 +295,9 @@ dmaQueueOamTransfer:
   sta.l MDMAEN
 
   rep #$31
-;  plp
   rts
 
 dmaQueueCgramTransfer:
-;  php
-;  rep #$31
-
   ldx.w GLOBAL.dmaQueueChannel.index
 
   lda.w GLOBAL.dmaQueue.1.sourceAdress,y
@@ -347,31 +333,8 @@ dmaQueueCgramTransfer:
   sta.l MDMAEN
 
   rep #$31
-;  plp
   rts
 
-
-/**
-* set normal or fixed source transfer
-*/
-/*
-dmaQueueSetDmap0:
-  .ACCU 8
-  pha
-  lda.w GLOBAL.dmaQueue.1.transferType,y
-  bit.b #DMA_TRANSFER.OPTION.FIXED_SOURCE
-  bne dmaQueueSetDmap0Fixed
-
-  pla
-  sta.l DMAP0
-  rts
-
-dmaQueueSetDmap0Fixed:
-  pla
-  ora.b #DMAP_FIXED_TRANSFER
-  sta.l DMAP0
-  rts
-*/
 
 dmaQueueSetDmap0:
   .ACCU 8
@@ -408,7 +371,6 @@ dmaQueueSetDmap0:
   ;mask screen below irq
   lda #(W12SEL_BG2_W1_ENABLE | W12SEL_BG1_W1_ENABLE)
   sta.l W12SEL
-  ;sta.w window12Sel
 
   lda #0
   sta.l W1L
@@ -418,12 +380,10 @@ dmaQueueSetDmap0:
   
   lda #(WOBJSEL_COL_W1_ENABLE | WOBJSEL_COL_W1_ENABLE)
   sta.l WOBJSEL
-  ;sta.w windowObjSel
-  
+ 
   
   lda #(T_BG2_ENABLE | T_BG1_ENABLE)
   sta.l TMW
-  ;sta.w windowMainscreen
   
   lda.b #INIDSP_FORCE_BLANK
   sta.l INIDSP
@@ -431,7 +391,6 @@ dmaQueueSetDmap0:
   jsr core.dma.processQueue
 
   lda.w ScreenBrightness
-  ;and.b #INIDSP_FORCE_BLANK ~$ff
   sta.l INIDSP
   plp
   rts

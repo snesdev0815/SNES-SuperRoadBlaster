@@ -172,19 +172,7 @@ _initBadArgs:
 + lda #OBJR_kill
   sta 3,s
   rts
-/*
-  METHOD setPosition
-  rts
 
-  METHOD getPosition
-  rts
-
-  METHOD getSize
-  rts
-
-  METHOD translate
-  rts
-*/
 /**
 * return amount & location of allocated memory
 * 

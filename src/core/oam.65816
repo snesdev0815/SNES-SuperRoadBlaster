@@ -27,37 +27,11 @@ core.oam.init:
 
   jsr core.oam.clearTable
 
-/*
-  ;allocate intial sprite memory for nametable in vram
-  rep #$31
-  lda.w #SPRITE.NAMETABLE.GRANULARITY
-  ldy.w #SPRITE.NAMETABLE.PRIMER
-  ldx.w #SPRITE.TILE.GRANULARITY
-  
-  jsr core.vram.allocate
-  bcs +
-	pei (SPRITE.TILE.GRANULARITY)
-    TRIGGER_ERROR E_OutOfVram
-
-
-+ stx.w GLOBAL.oam.vram.start
-  sep #$20
-  sta.w GLOBAL.oam.vram.id
-*/
   stz.w GLOBAL.oam.vram.id
   lda.w MainScreen
   ora.b #T_OBJ_ENABLE
   sta.w MainScreen
 
-/*
-  rep #$31
-  ;set nametable1, 2, sprite size
-  lda.w GLOBAL.oam.vram.start
-  rol a
-  rol a
-  rol a
-  sta.w ObjSel
-*/
   plp
   rts
 
@@ -95,7 +69,7 @@ core.oam.play:
 	lda #DMA_TRANSFER.OAM		;transfer type
 	pha
 	pea GLOBAL.oamBuffer	;source adress
-	;lda #:GLOBAL.oamBuffer		;source bank
+
 	lda #RAM	;@fixme, this is a hack. must find out why above returns $00 instead of $7e
 	pha
 	pea OAM.TABLE.0.START	;target
@@ -103,28 +77,6 @@ core.oam.play:
 
 	jsr core.dma.registerTransfer
 	
-      ;dummy write for priority rotation
-/*
-      rep #$31
-      lda.w #WRAM.CLEAR_PATTERN.OAM
-      ldy.w #GLOBAL.oamBuffer.end - GLOBAL.oamBuffer
-      ldx.w #GLOBAL.oamBuffer
-      jsr ClearWRAM
-
-      sep #$20
-*/      
-/*
-      lda #DMA_TRANSFER.OAM       ;transfer type
-      pha
-      pea GLOBAL.oamBuffer & $ffff + (127 * 4)    ;source adress
-      ;lda #:GLOBAL.oamBuffer     ;source bank
-      lda #RAM    ;@fixme, this is a hack. must find out why above returns $00 instead of $7e
-      pha
-      pea 127/2 | (OAMADDH_PRIORITY_ACTIVATE << 8)   ;target, set priority to last sprite
-      pea 4  ;length
-
-      jsr core.dma.registerTransfer
-*/
 	txs
 
 + stz.w GLOBAL.oamUploadFlag
@@ -197,34 +149,4 @@ _allocatedOk:
 
   rts
 
-/*
-  ;allocate intial sprite memory for nametable in vram
-  rep #$31
-  lda.w #SPRITE.NAMETABLE.GRANULARITY
-  ldy.w #SPRITE.NAMETABLE.PRIMER
-  ldx.w #SPRITE.TILE.GRANULARITY
-  
-  jsr core.vram.allocate
-  bcs +
-	pei (SPRITE.TILE.GRANULARITY)
-    TRIGGER_ERROR E_OutOfVram
-
-
-+ stx.w GLOBAL.oam.vram.start
-  sep #$20
-  sta.w GLOBAL.oam.vram.id
-*/
-  lda.w MainScreen
-  ora.b #T_OBJ_ENABLE
-  sta.w MainScreen
-
-/*
-  rep #$31
-  ;set nametable1, 2, sprite size
-  lda.w GLOBAL.oam.vram.start
-  rol a
-  rol a
-  rol a
-  sta.w ObjSel
-*/
 .ends

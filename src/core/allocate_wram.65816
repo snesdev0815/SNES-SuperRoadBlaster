@@ -33,15 +33,7 @@ core.wram.init:
   plp
   rts
 
-/**
-*
-*/
-/*
-allocateWramBadStepsize:
-  pha
-  TRIGGER_ERROR E_VallocBadStepsize
 
-*/
 /**
 * attempt allocating desired wram space
 *
@@ -54,15 +46,7 @@ allocateWramBadStepsize:
 core.wram.allocate:
   php
   rep #$31
-/*
-  cmp.w #WRAM_ALLOCATION_STEP.MIN
-  bcc allocateWramBadStepsize
 
-  cmp.w #WRAM_ALLOCATION_STEP.MAX + 1
-  bcs allocateWramBadStepsize
-
-  sta.w GLOBAL.wramAllocation.input.stepsize
-*/
   cpx.w #0
   bne +
     TRIGGER_ERROR E_VallocInvalidLength
@@ -145,14 +129,7 @@ _allocateWramSeekFreeBlocks:
 
   ldy.w #0
   sty.w GLOBAL.wramAllocation.temp.start
-/*
-  tya
-  sta.w GLOBAL.wramAllocation.temp.start
-  xba			;allocatio blocksize: $100
-  and.w #$ff
 
-  tay
-*/
 _allocateWramSeekLoop:
   lda.w GLOBAL.wramAllocationBlocks,y
   and.w #$ff
@@ -175,13 +152,7 @@ _allocateWramSeekLoop:
 
 +
 	sta.w GLOBAL.wramAllocation.temp.start
-	/*lsr a		;allocation blocksize : $80
-	lsr a
-	lsr a
-	lsr a
-	lsr a
-	lsr a
-	lsr a*/
+
 	xba			;allocation blocksize : $100
 	and.w #$ff
 	cmp.w #WRAM_ALLOCATION_BLOCKS
@@ -227,28 +198,11 @@ _markAllocatedWramBlocks:
   pha
 
   lda.w GLOBAL.wramAllocation.temp.start
-  /*lsr a		;allocation blocksize : $80
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a*/
+
   xba			;allocation blocksize : $100
   and.w #$ff
   tay
 
-/*
-  ;$100 byte blocks
-  lda.w GLOBAL.wramAllocation.input.length
-  xba
-  ;half-occupied blocks present? will occupy full block
-  bit.w #$ff00
-  beq +
-	inc a
-
-+ and.w #$ff
-*/
   ;$80 byte blocks
   lda.w GLOBAL.wramAllocation.input.length
   ;half-occupied blocks present? will occupy full block
@@ -257,13 +211,7 @@ _markAllocatedWramBlocks:
 	clc
 	adc.w #WRAM_ALLOCATION_BLOCKSIZE
 
-+ /*lsr a		;allocation blocksize : $80
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a*/
++
   xba			;allocatio blocksize: $100
   and.w #$ff
   tax

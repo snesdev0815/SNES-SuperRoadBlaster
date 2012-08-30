@@ -1,5 +1,4 @@
 /**
-* right arrow sprite
 * 
 * @param 1<int, 8bit>  bg-layer id
 * @param 2<int, 16bit>  animation id

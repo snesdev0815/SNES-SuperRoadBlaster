@@ -26,10 +26,6 @@ abstract.Background.startAnimation:
   rep #$31
 
   ;init some vars
-
-  ;stx.b animation.isColorMath
-  ;sty.b animation.isLooping
-
   and.w #$ff
   sta.b animation.id
   asl a
@@ -72,7 +68,6 @@ abstract.Background.startAnimation:
   sta.b animation.tilemap.length
 
   jsr abstract.Background.deallocate
-  ;jsr _allocateMemory
   
   stz.b animation.frame.current
   stz.b animation.frame.last
@@ -141,9 +136,6 @@ abstract.Background.playAnimation:
   cmp.b animation.tilemap.length
   bcc +
   beq +
-    /*pei (animation.id)
-    pei (animation.frame.current)
-    TRIGGER_ERROR E_AllocatedVramExceeded*/
     ;fail silently in case tilemap length has been forced to be lower
     lda.b animation.tilemap.length
 +
@@ -154,9 +146,6 @@ abstract.Background.playAnimation:
   cmp.b animation.palette.length
   bcc +
   beq +
-	  /*pei (animation.id)
-	  pei (animation.frame.current)
-      TRIGGER_ERROR E_AllocatedCgramExceeded*/
       ;fail silently in case palette length has been forced to be lower
       lda.b animation.palette.length
 +
@@ -183,8 +172,6 @@ abstract.Background.playAnimation:
 +
     
 _noBufferUpload:
-;  jsr _writeOamBuffer
-
   lda.b animation.frame.current
   sta.b animation.frame.last
 
@@ -198,7 +185,6 @@ _noBufferUpload:
 	bne _notPlaying
 
 	  lda.b animation.frame.current
-	  ;inc a
 	  cmp.b animation.frame.max
 	  bcc ++
 
@@ -386,9 +372,6 @@ _tilemapTransfer:
 
   ldx.b animation.ramBuffer.start
 
-/*  cpx.w #GLOBAL.oamBuffer.end - GLOBAL.oamBuffer
-  bcs _oamBufferFull*/
-
   ;loop over frame tiles, get tile config
 -   lda.b [animation.frame.pointer],y
 
@@ -516,37 +499,11 @@ abstract.Background.allocateMemory:
   sta.b animation.ramBuffer.id
   rep #$31
 
-
-/*
-  ;calculate tile transpose id
-  pha
-  jsr core.oam.getNametableBase
-  tya
-  sta 1,s
-  lda animation.tiles.start
-  sec
-  sbc 1,s
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-  lsr a
-
-  sep #$20
-  sta animation.tiles.startid
-  xba
-  and.b #%1
-  sta animation.buffer.nametable
-  rep #$31
-  pla
-*/
-
   lda.b animation.tiles.bpp
   and.w #$ff
   asl a
   tax
   lda.l PALETTE.GRANULARITY.LUT,x
-  ;lda.w #PALETTE.GRANULARITY.8BPP
   ldy.w #PALETTE.START.BG
   ldx.b animation.palette.length
   beq ++
@@ -567,8 +524,6 @@ abstract.Background.allocateMemory:
     lsr a ;divide by $20
     lsr a
     lsr a
-  ;  lsr a
-  ;  lsr a
 
     sep #$20
     and.b #BG.PALETTE.BITS

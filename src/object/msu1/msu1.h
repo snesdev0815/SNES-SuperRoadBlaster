@@ -1,12 +1,5 @@
 .include "src/config/config.inc"
 
-/*
-.ramsection "oop obj ram zp" bank 0 slot 2
-
-.ends
-*/
-
-
 .define MSU1_SEEK_TIMEOUT $2000
 .define MSU1_MAX_TILE_TRANSFER_LENGTH $2000
 .define MSU1_CHUNK_DIFFERENCE $380
@@ -20,7 +13,7 @@
 .define VRAM_TILEMAP.LENGTH	$800
 .define VRAM_TILES	$2000
 .define CGRAM_PALETTE	0
-;.define V_SCROLL	-33
+
 .define V_SCROLL    0
 
 
@@ -99,24 +92,7 @@
 .enum 0
   iterator INSTANCEOF iteratorStruct
   this INSTANCEOF msu1Struct
-/*
-_tmp ds 8
-msu1Bpp ds 1
-msu1Fps ds 1
-msu1FrameCount ds 2
-msu1CurrentFrame ds 2
-msu1CurrentFramePointer ds 4
-msu1CurrentTrack db
-msu1VideoPlaying db
 
-msu1PaletteLength dw
-msu1TilemapLength dw
-msu1TilesLength dw
-msu1Framebuffer INSTANCEOF oopObjHash MSU1.FRAMEBUFFER.COUNT
-msu1CurrentFramebuffer INSTANCEOF oopObjHash
-msu1CurrentStart dw
-msu1CurrentLength dw
-*/
 zpLen ds 0
 .ende
 
@@ -136,10 +112,6 @@ MSU1.GLOBAL.END ds 0
 
 .base BSL
 .bank 0 slot 0
-/*.section "msu1Dat"
-	OOPOBJ Msu1 $81 zpLen playVideo stopVideo getCurrentFrame
-.ends*/
-
 
 .Section "msu1HardwareString" superfree
 msu1HardwareIdentifier:

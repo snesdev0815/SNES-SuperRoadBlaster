@@ -1,5 +1,5 @@
 /**
-* just a little object to automatically test core functionality
+* generic script handler
 * 
 */
 .include "src/object/script/abstract.Script.h"

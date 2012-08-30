@@ -9,8 +9,6 @@
 
   METHOD init
   sep #$20
-;  inc.b animation.isColorMath
-
   rep #$31
   sta this.endFrame
 
@@ -19,21 +17,7 @@
 
   lda OBJECT.CALL.ARG.2,s
   sta.b dimension.position.y + 1
-/*
-  jsr abstract.Iterator.reset
 
-  lda.w #OBJID.Brake_icon
-  jsr abstract.Iterator.each.byId
-  bcc +
-    CALL Brake_icon.getAllocatedPalette.MTD iterator.target
-    sep #$20
-    stx.b animation.palette.start
-    sta.b animation.palette.id
-    tya
-    sta.b animation.palette.startid
-    rep #$31
-+
-*/
   lda #SPRITE.turbo.PTR
   jsr abstract.Sprite.startAnimation
   sep #$20
@@ -51,9 +35,9 @@
   bcc +
     lda #300
     sta.b dimension.position.y + 1  
-  	;CALL Turbo_icon.kill.MTD iterator.self
 
 + rts
+
 
   METHOD reset
   rep #$31
@@ -66,6 +50,7 @@
   sta.b dimension.position.y + 1
   rts
 
+
   METHOD getAllocatedPalette
   rep #$31  
   ldx.b animation.palette.start
@@ -75,6 +60,7 @@
   lda.b animation.palette.id
   and.w #$ff
   rts
+
   
   METHOD kill
   rep #$31
@@ -82,6 +68,7 @@
   lda #OBJR_kill
   sta 3,s	
   rts
+
 
   CLASS Turbo_icon reset getAllocatedPalette
 .ends	

@@ -92,7 +92,7 @@ _level_complete.start:
   lda #T_levelComplete.PTR
   pei (currentLevel)
   CALL Background.textlayer.16x16.print.MTD objFameText
-  ;jsr core.string.parse
+
   pla
   pla
   

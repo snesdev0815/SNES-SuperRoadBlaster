@@ -28,11 +28,8 @@
 
   sta.b this.lifes
   jsr abstract.Sprite.playAnimation
-/*
-  lda #SPRITE.LIFE_CAR.MAXAGE
-  sta this.age
-*/  
   rts
+
 
   METHOD play
   rep #$31

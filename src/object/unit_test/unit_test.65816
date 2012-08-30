@@ -7,18 +7,8 @@
 
   METHOD init
   rep #$31
-  /*jsr _allocateVram
-  bcs +
-	pea 1
-    TRIGGER_ERROR E_UnitTestFail
 
-+ */
-/*  jsr _allocateCgram
-  bcs +
-	pea 2
-    TRIGGER_ERROR E_UnitTestFail
-
-+ */jsr _testObject
+  jsr _testObject
   bcs +
 	pea 3
     TRIGGER_ERROR E_UnitTestFail
@@ -278,12 +268,6 @@ _allocateCgram:
   ldy #$20	;start adress
   jsr core.cgram.allocate
   bcs _allocateCgramFail		;allocation must fail, 8 palette limit exceeded
-
-/*  cmp.w #3	;must return id
-  bne unitTest_allocateCgramFail
-
-  cpx.w #$10	;must have allocated vram adress
-  bne unitTest_allocateCgramFail*/
 
   lda #$20	;stepsize
   ldx #$100	;blocksize

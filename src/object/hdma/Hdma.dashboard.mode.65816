@@ -1,8 +1,6 @@
 /**
 * hdma object that switches msu1 video playback to direct-color dashboard mid-screen
 *
-somehow, one of the five allocated hdma channels ends up being doubled after using single wram buffer, but only after second scene (???)
-no idea 
 */
 .include "src/object/hdma/Hdma.dashboard.mode.h"
 .section "Hdma.dashboard.mode"
@@ -91,7 +89,6 @@ no idea
  * @param a<int, 16bit> target y-position of dashboard switch
  */  
   METHOD setYPosition
-;  rts
   rep #$31
   and.w #$ff
   sta this.position
@@ -162,13 +159,6 @@ no idea
   ;extremely evil hack to make sure all hdma buffers have stopped before continuing
   jsr core.nmi.waitFrame
   
-  /*
-  jsr core.nmi.waitFrame
-  jsr core.nmi.waitFrame
-  jsr core.nmi.waitFrame
-  jsr core.nmi.waitFrame
-  jsr core.nmi.waitFrame
-  */
   jsr abstract.Hdma.deallocateBuffer
   lda #OBJR_kill
   sta 3,s   
@@ -220,11 +210,6 @@ _setupChannel:
   sta this.current.register.pre
   tya
   sta this.current.register.post
-/*  
-  lda #$10
-  sta hdma.ramBuffer.length
-  jsr abstract.Hdma.allocateBuffer
-*/
 
   lda this.current.channel
   sec
@@ -236,12 +221,7 @@ _setupChannel:
   lda #HDMA.DASHBOARD.MODE.CHANNEL.LENGTH
   sta hdma.ramBuffer.length
 
-  ;lda this.ramBuffer.id
-  ;sta hdma.ramBuffer.id  
-  
-
   jsr _buildHdmaList
-  
 
   lda hdma.ramBuffer.start
   clc

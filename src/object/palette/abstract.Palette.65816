@@ -63,13 +63,15 @@ _fetchPalette:
   lda palette.color.start
   asl a
   pha
-  ;pei (palette.ramBuffer.start) ;fixme, this is bogus!
+
   pei (palette.ramBuffer.length)
 
   jsr core.dma.registerTransfer
   txs
   plp
   rts
+
+
 /**
 * upload palette from buffer to cgram
 */
@@ -95,7 +97,6 @@ abstract.Palette.flush:
   lda palette.color.start
   asl a
   pha
-  ;pei (palette.ramBuffer.start) ;fixme, this is bogus!
   pei (palette.ramBuffer.length)
 
   jsr core.dma.registerTransfer

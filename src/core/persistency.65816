@@ -18,7 +18,6 @@ core.persistency.init:
 _loadBad:
   ;if loading failed at any point, delete every serialized object created so far so that no stray objects lie around
   rep #$31
-  ;lda.w #OBJECT.PROPERTIES.isSerializable
   lda this.target.properties
   jsr abstract.Iterator.kill.byProperties
 
@@ -34,7 +33,6 @@ _loadBad:
 * 
 * @return c<bool>   True if load successful.
 */
-  
 core.persistency.load:
   php
   phd
@@ -44,7 +42,6 @@ core.persistency.load:
   ;first, kill all present serializable objects so that no object is there twice  
   rep #$31
   sta this.target.properties
-  ;lda.w #OBJECT.PROPERTIES.isSerializable
   lda this.target.properties
   jsr abstract.Iterator.kill.byProperties
   
@@ -167,9 +164,6 @@ core.persistency.load:
     bra -
 
 +  
-  /*sep #$20
-  
-  jsr abstract.Iterator.reset*/
 
 _loadOk:
   pld
@@ -318,7 +312,6 @@ core.persistency.save
 
   jsr abstract.Iterator.reset
 -   rep #$31
-    ;lda.w #OBJECT.PROPERTIES.isSerializable
     lda this.target.properties
     jsr abstract.Iterator.each.byProperties
     sep #$20
@@ -351,7 +344,6 @@ core.persistency.save
     beq -
     
     ;fetch object zero page pointer
-    ;ldx.b iterator.target + 2
     rep #$31
     lda.l OopStack.dp,x
     tay
@@ -408,34 +400,6 @@ core.persistency.save
   pld
   plp
   rts
-
-  
-/*
- * getting object id from hash:
-        lda.l OopStack.id,x
-        sta.b iterator.target
-        lda.l OopStack.num,x
-        sta.b iterator.target + 1
-        txa
-        sta.b iterator.target + 2
-*/
-
-/* getting variables from object
-  * @param x <int, 16bit>    ;pointer to object in object stack, usually fetched from object hash
- * @return a <int, 16bit>   ;word value of key variable
-
-_getKeyValue:
-  .accu 16
-  .index 16
-  lda.l OopStack.dp,x
-  clc
-  adc.b iterator.sort.key   ;no boundary checking here! If variable key adress is > objects zp-page, this might spill over into other objects!
-  tay
-  lda.w 0,y ;get 16bit key
-  rts
- 
- 
- */  
   
 .ends	
 	

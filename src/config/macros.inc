@@ -89,10 +89,7 @@ pla
 
 ldy #\1
 ldx #\2
-/*.ifdefm \3
-lda #\3
-.endif
-jsr core.object.create*/
+
 
 .ifdefm \9
 pea \9
@@ -118,7 +115,7 @@ pea \5
 pea \4
 .endif
 
-;;???didnt we agree to not auto-define a-parameters?
+
 .ifdefm \3
 pea \3
 ;lda #\3
@@ -165,14 +162,7 @@ pla
 ;terminate call, don't do any garbage collection
 .macro RETURN
 	rts
-/*
-	rep #$31
-	tsc
-	clc
-	adc #7	;two RTLs from script, one RTS from script dispatcher
-	tcs
-	rtl
-*/
+
 .endm
 
 ;wait for equation(two variables) to become true. If not true, save current PC and return, then try again next frame

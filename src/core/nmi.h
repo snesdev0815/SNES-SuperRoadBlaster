@@ -62,8 +62,6 @@ frameIrqCount dw
 frameBuffHistory ds 3
 irqCheckpoint db
 
-;charConvReady db	;0=wait, 1=ready moved to main.h
-
 NmiGlobalVarsEnd ds 0
 .ends
 

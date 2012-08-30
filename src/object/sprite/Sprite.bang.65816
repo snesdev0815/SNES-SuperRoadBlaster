@@ -49,8 +49,7 @@
   jsr abstract.Sprite.playAnimation
   
   jsr abstract.Sprite.isAnimationPlaying
-  bcc _kill
-  
+  bcc _kill  
   rts
 
   METHOD kill

@@ -1,8 +1,5 @@
 .include "src/config/config.inc"
 
-/*.def DASHBOARD.IRQ.X 260
-.def DASHBOARD.IRQ.Y 164-33*/
-
 .def DASHBOARD.DISPLACEMENT.Y 164-33
 
 .struct vars

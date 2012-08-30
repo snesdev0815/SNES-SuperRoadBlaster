@@ -111,19 +111,6 @@ excArgs	ds 8
 .section "exception font pal" superfree
 	FILEINC ExcFontPal "build/data/font/fixed8x8.gfx_font.palette" 8
 .ends
-/*
-.section "exception string command lut"
-	ExcStrCmdLut:
-		PTRNORM ExcStrCmdLut SUB_TC_end
-		PTRNORM ExcStrCmdLut SUB_TC_sub
-		PTRNORM ExcStrCmdLut SUB_TC_iSub
-		PTRNORM ExcStrCmdLut SUB_TC_dSub
-		PTRNORM ExcStrCmdLut SUB_TC_diSub
-		PTRNORM ExcStrCmdLut SUB_TC_pos
-		PTRNORM ExcStrCmdLut SUB_TC_brk
-		PTRNORM ExcStrCmdLut SUB_TC_hToS
-.ends
-*/
 
 .section "err-msg string LUT" superfree
 	ExcErrMsgStrLut:

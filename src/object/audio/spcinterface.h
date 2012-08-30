@@ -283,10 +283,6 @@ PtplayerSpcCodeEnd:
 .ends	
 
 
-/*.section "spcDat"
-	OOPOBJ Spc $81 zpLen playSong SpcSetReportType registerStimulusCallback
-.ends*/
-
 .section "SpcHandlerSubroutineJumpLUT"
 SpcHandlerSubroutineJumpLUT:
 	PTRNORM	SpcHandlerSubroutineJumpLUT	SpcInit

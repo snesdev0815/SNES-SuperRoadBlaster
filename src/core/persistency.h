@@ -23,19 +23,7 @@
   SRAM.SLOT.SIZE db
 
 .ende
-/*
-;ram buffers
-.ramsection "global persistency vars" bank 0 slot 1
-PERSISTENCY.GLOBAL.START ds 0
-GLOBAL.persistency.sram.pointer ds 3
-GLOBAL.persistency.checksum dw
-GLOBAL.persistency.object.id db
-GLOBAL.persistency.object.length db
-GLOBAL.persistency.class.pointer db
 
-PERSISTENCY.GLOBAL.END ds 0
-.ends
-*/
 .struct vars
   target.properties dw
   sram.pointer ds 3

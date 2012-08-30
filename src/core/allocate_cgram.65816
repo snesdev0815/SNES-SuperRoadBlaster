@@ -184,10 +184,8 @@ _allocateCgramSeekFreeBlocks:
   lsr a
   lsr a
   lsr a
-  ;and.w #CGRAM_ALLOCATION_BLOCKS - 1
+
   tay
-  ;ldy.w #0
-  ;stz.w GLOBAL.cgramAllocation.temp.start
 
 _allocateCgramSeekLoop:
   lda.w GLOBAL.cgramAllocationBlocks,y
@@ -344,7 +342,6 @@ core.cgram.clear:
   tsx
   lda #DMA_TRANSFER.CGRAM | DMA_TRANSFER.OPTION.FIXED_SOURCE        ;transfer type
   pha
-  ;pea MSU_DATA  ;source adress
   pea _core.cgram.clear.pattern ;source adress
   lda :_core.cgram.clear.pattern        ;source bank
   pha

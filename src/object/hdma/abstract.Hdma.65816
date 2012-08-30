@@ -1,9 +1,7 @@
 /**
-* abstract Sprite methods
+* abstract HDMA methods
 *
 */
-
-
 .include "src/object/hdma/abstract.Hdma.h"
 .section "abstract.Hdma"
 
@@ -92,9 +90,6 @@ abstract.Hdma.makePhysical:
 	and.w GLOBAL.HDMA.CHANNEL.ENABLE
 	sta.w GLOBAL.HDMA.CHANNEL.ENABLE
 
-    ;make sure canceled hdma transfers end immediately because the ram space where the corresponding hdma table lies might get deallocated and overwritten immediately
-    ;hopefully this doesnt break anything...
-    ;sta.l HDMAEN
 	plp
 	rts
 
@@ -103,11 +98,9 @@ abstract.Hdma.makePhysical:
 
   lda hdma.table.adress
   sta.l DMASRC0L,x
-  ;sta.l DMALEN0L,x
 
   lda hdma.table.adress + 1
   sta.l DMASRC0H,x
-  ;sta.l DMALEN0H,x
 
   sep #$20
   lda hdma.flags

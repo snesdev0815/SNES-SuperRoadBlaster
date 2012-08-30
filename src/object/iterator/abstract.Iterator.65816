@@ -278,13 +278,7 @@ abstract.Iterator.killOthers:
 -	lda iterator.properties
 	jsr abstract.Iterator.others
 	bcc +
-/*
-	lda iterator.self
-	lda iterator.target
-	clc
-	lda iterator.self+2
-	lda iterator.target+2
-*/
+
 	CALL abstract.Iterator.kill.MTD iterator.target
 	bra -
 

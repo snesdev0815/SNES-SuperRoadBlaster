@@ -1,5 +1,5 @@
 /**
-* brightness handler, fades in/out
+* 
 */
 .include "src/object/player/pause.h"
 .section "pause"
@@ -11,23 +11,12 @@
   rep #$31
   NEW Brightness.CLS.PTR this.brightness
 
-/*  sep #$20
-  lda #PAUSE.DELAY
-  sta this.wait */
   rts
 
   /**
   *
   */
   METHOD play
-/*  ;extremely bad hack, wait a couple of frames before allowing pause to happen to allow msu1 to initialize
-  sep #$20
-  lda this.wait
-  beq +
-    dec this.wait
-    rts
-
-+ */
   rep #$31
 
   ;pause button pressed?

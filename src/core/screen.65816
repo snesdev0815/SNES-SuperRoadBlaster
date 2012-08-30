@@ -140,7 +140,6 @@ core.screen.convertAbsoluteToScreen:
 * @return c	true if position is on screen
 */
 core.screen.checkIfOnScreen:
-;  pha
   cpx.w GLOBAL.screen.position.x
   bcc +
 
@@ -159,28 +158,8 @@ core.screen.getPosition:
   ldx.w GLOBAL.screen.position.x
   ldy.w GLOBAL.screen.position.y
   rts
-/*
-  txa
-  sta 1,s
-  lda.w GLOBAL.screen.position.x
-  clc
-  adc.w GLOBAL.screen.size.x
-  cmp 1,s
-  bcc +
 
-  tya
-  sta 1,s
-  lda.w GLOBAL.screen.position.y
-  clc
-  adc.w GLOBAL.screen.size.y
-  cmp 1,s
-  bcc +
-*/
-;  pla
-  sec
-  rts
-
-+; pla
++
   clc
   rts
 

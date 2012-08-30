@@ -41,8 +41,6 @@
   */
   METHOD fadeTo
   sep #$20
-;  jsr _isDone
-;  bcc ++
 	cmp.b #BRIGHTNESS.FULL + 1
 	bcc +
       TRIGGER_ERROR E_Todo
@@ -51,9 +49,6 @@
 	sec
 	rts
 
-/*++
-  clc
-  rts*/
 
   /**
   * has target brightness been reached?

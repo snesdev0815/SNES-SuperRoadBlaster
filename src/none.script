@@ -1,6 +1,5 @@
 
-	SCRIPT none
-.ACCU 16
-.INDEX 16
-  TRIGGER_ERROR E_Sa1Test
+  SCRIPT none
+
+  TRIGGER_ERROR E_Todo
 

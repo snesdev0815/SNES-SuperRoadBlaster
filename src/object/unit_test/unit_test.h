@@ -22,9 +22,6 @@
 
 .base BSL
 .bank 0 slot 0
-/*.section "unit_test_obj"
-	OOPOBJ Unit_test $81 zpLen
-.ends*/
 
 
 

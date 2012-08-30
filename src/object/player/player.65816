@@ -73,7 +73,6 @@
   sep #$20
   lda this.lifes
   bne +
-    ;jsr _reset
 	sec
 	rts
 

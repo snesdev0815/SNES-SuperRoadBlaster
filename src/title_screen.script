@@ -15,7 +15,6 @@
   .def irq.buffer.x this._tmp
   .def irq.buffer.y this._tmp + 2
 
-  ;EVENT Event.confirm.CLS.PTR $0000 $0164 EventResult.playchapter main_menu 0 0 0
   NEW Brightness.CLS.PTR objBrightness
 
   lda #BRIGHTNESS.NONE
@@ -36,7 +35,7 @@
   sta.w ScreenMode
   lda.w MainScreen
   and.b #(T_BG1_ENABLE | T_BG2_ENABLE | T_BG3_ENABLE | T_BG4_ENABLE) ~$ff
-  ;ora.b #T_BG1_ENABLE
+
   sta.w MainScreen
   rep #$31
 
@@ -121,12 +120,8 @@
 +
   lda.w #SAMPLE.0.TECHNIQUE
   CALL Spc.SpcPlaySoundEffect.MTD objSpc
-  ;lda.w #Song.start.PTR
-  ;CALL Spc.playSong.MTD objSpc
-
 
   NEW Pause.CLS.PTR oopCreateNoPtr
-
 
   lda #BRIGHTNESS.NONE
   CALL Brightness.fadeTo.MTD objBrightness
@@ -162,9 +157,8 @@
   jsr core.cgram.clear
 
   NEW Script.CLS.PTR oopCreateNoPtr level1
-  ;NEW Script.CLS.PTR oopCreateNoPtr level_complete1
 
-  rts
+;  rts
   DIE
 
 

@@ -9,8 +9,6 @@
 
   METHOD init
   sep #$20
-;  inc.b animation.isColorMath
-
   rep #$31
   sta this.endFrame
 
@@ -63,7 +61,6 @@
   bcc +
     lda #224
     sta.b dimension.position.y + 1  
-  	;CALL Right_arrow.kill.MTD iterator.self
 
 + rts
 

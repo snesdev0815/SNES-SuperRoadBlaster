@@ -1,24 +1,5 @@
 .include "src/config/config.inc"
-/*
-.enum 0
-  SPRITE_ANIMATION.MAGIC dw
-  SPRITE_ANIMATION.MAX.TILES dw
-  SPRITE_ANIMATION.MAX.PALETTE dw
-  SPRITE_ANIMATION.MAX.FRAMES dw
-  SPRITE_ANIMATION.BPP db
-  SPRITE_ANIMATION.FRAME.POINTER dw
-.ende
 
-.enum 0
-  SPRITE_ANIMATION.FRAME.TILES.LENGTH dw
-  SPRITE_ANIMATION.FRAME.TILEMAP.LENGTH dw  
-  SPRITE_ANIMATION.FRAME.PALETTE.LENGTH dw
-  SPRITE_ANIMATION.FRAME.DATA dw
-.ende
-;wla dx is too stupid to use this as a word value, so this hack has to do
-;.def SPRITE_ANIMATION.MAGIC.VALUE "SP"
-.def SPRITE_ANIMATION.MAGIC.VALUE $5053
-*/
 .def OAM.PALETTE.BITS %1110
 
 ;zp-vars,just a reference
@@ -40,7 +21,6 @@ zpLen ds 0
 
 .Section "SpriteAnimationLUT" superfree
 SpriteAnimationLUT:
-  ;PTRLONG SpriteAnimationLUT SPRITE.zero
   PTRLONG SpriteAnimationLUT SPRITE.right_arrow
   PTRLONG SpriteAnimationLUT SPRITE.left_arrow
   PTRLONG SpriteAnimationLUT SPRITE.turbo

@@ -213,12 +213,10 @@ OopClassLut:
 	PTRLONG OopClassLut Event.macro_vibrate2.CLS
 	PTRLONG OopClassLut Event.macro_vibrate3.CLS
 	PTRLONG OopClassLut Event.macro_rockfast.CLS
-	;PTRLONG OopClassLut Zero.CLS
 	PTRLONG OopClassLut Right_arrow.CLS
 	PTRLONG OopClassLut Left_arrow.CLS
 	PTRLONG OopClassLut Turbo_icon.CLS
 	PTRLONG OopClassLut Brake_icon.CLS
-;	PTRLONG OopClassLut Dashboard.CLS
 	PTRLONG OopClassLut VideoMask.CLS
 	PTRLONG OopClassLut SteeringWheel.CLS
 	PTRLONG OopClassLut Background.generic.CLS
@@ -226,7 +224,6 @@ OopClassLut:
 	PTRLONG OopClassLut Player.CLS
 	PTRLONG OopClassLut Pause.CLS
 	PTRLONG OopClassLut LogoZoom.CLS
-;	PTRLONG OopClassLut Persistency.CLS
 	PTRLONG OopClassLut Score.CLS
 	PTRLONG OopClassLut Background.textlayer.8x8.CLS
 	PTRLONG OopClassLut Background.textlayer.16x16.CLS

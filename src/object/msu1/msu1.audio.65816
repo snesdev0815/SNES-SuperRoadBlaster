@@ -184,14 +184,6 @@ _stopAudioTrack:
   sta.l MSU_CONTROL
   jsr _waitAudioBusy
 
-  /* @todo
-  ;check if msu1 actually stopped playing
-  lda.l MSU_STATUS
-  and.b #MSU_STATUS_AUDIO_PLAY
-  bne _msu1playAudioError
-  */
-
-
   plp
   rts
 
@@ -257,7 +249,6 @@ _waitAudioBusy:
   ldx.w #MSU1_SEEK_TIMEOUT
 
 -	dex
-;	beq _msu1playAudioTimeout
 	lda.l MSU_STATUS
 	and.b #MSU_STATUS_AUDIO_BUSY
 	bne -
